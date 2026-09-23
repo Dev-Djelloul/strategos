@@ -94,7 +94,12 @@ async function loadEvents() {
       marker.addTo(markersLayer);
     });
 
-    statusEl.textContent = `${features.length} événement(s) — mis à jour ${new Date().toLocaleTimeString("fr-FR")}`;
+    const time = new Date().toLocaleTimeString("fr-FR");
+    if (geojson.source === "demo_fallback") {
+      statusEl.textContent = `⚠️ GDELT indisponible — données démo affichées (${features.length}) — ${time}`;
+    } else {
+      statusEl.textContent = `${features.length} événement(s) — mis à jour ${time}`;
+    }
   } catch (err) {
     statusEl.textContent = `Erreur de chargement (${err.message})`;
   }

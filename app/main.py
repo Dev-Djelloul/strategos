@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -38,9 +38,20 @@ async def get_events(
     demo: bool = Query(default=False, description="Retourne des données factices sans appel réseau"),
 ):
     if demo:
-        return filter_demo_events(event_type=event_type, country=country)
+        result = filter_demo_events(event_type=event_type, country=country)
+        result["source"] = "demo"
+        return result
+
     query = build_query(event_type=event_type, country=country)
     try:
-        return await fetch_conflict_events(query=query, timespan_minutes=timespan_minutes)
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Erreur GDELT: {exc}") from exc
+        result = await fetch_conflict_events(query=query, timespan_minutes=timespan_minutes)
+        result["source"] = "gdelt"
+        return result
+    except Exception:
+        # L'endpoint GEO de GDELT est un service gratuit sans garantie de
+        # disponibilité (404 intermittents documentés côté GDELT, hors de
+        # notre contrôle). On dégrade proprement vers les données démo
+        # plutôt que de casser l'app.
+        result = filter_demo_events(event_type=event_type, country=country)
+        result["source"] = "demo_fallback"
+        return result
