@@ -1,0 +1,87 @@
+:root {
+  --bg: #0e1116;
+  --panel: #161b22;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --accent: #c9302c;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.topbar {
+  padding: 12px 20px;
+  background: var(--panel);
+  border-bottom: 1px solid #30363d;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 1.4rem;
+  letter-spacing: 0.02em;
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 20px;
+  background: var(--panel);
+  border-bottom: 1px solid #30363d;
+}
+
+.controls select, .controls button {
+  background: #21262d;
+  color: var(--text);
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+}
+
+.controls button {
+  cursor: pointer;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.demo-label {
+  color: var(--muted);
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-left: auto;
+}
+
+#map {
+  height: calc(100vh - 108px);
+  width: 100%;
+}
+
+.leaflet-popup-content-wrapper {
+  background: var(--panel);
+  color: var(--text);
+}
+
+.leaflet-popup-tip {
+  background: var(--panel);
+}
