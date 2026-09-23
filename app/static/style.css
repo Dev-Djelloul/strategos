@@ -77,6 +77,10 @@ html, body {
   width: 100%;
 }
 
+.dark-tiles {
+  filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9);
+}
+
 .leaflet-popup-content-wrapper {
   background: var(--panel);
   color: var(--text);

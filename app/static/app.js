@@ -1,8 +1,12 @@
 const map = L.map("map", { worldCopyJump: true }).setView([20, 20], 2);
 
-L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-  attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-  maxZoom: 18,
+// OpenStreetMap standard : gratuit, sans clé API. Le filtre CSS (voir
+// style.css, classe .dark-tiles) inverse les couleurs pour simuler un
+// thème sombre sans dépendre d'un fournisseur de tuiles payant.
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: '&copy; OpenStreetMap contributors',
+  maxZoom: 19,
+  className: "dark-tiles",
 }).addTo(map);
 
 let markersLayer = L.layerGroup().addTo(map);
@@ -57,12 +61,12 @@ async function loadEvents() {
   statusEl.textContent = "Chargement…";
   markersLayer.clearLayers();
 
-  const timespan = timespanEl.value;
+  const timespanMinutes = timespanEl.value;
   const country = countryEl.value;
   const eventType = eventTypeEl.value;
   const demo = document.getElementById("demo-toggle")?.checked ? "&demo=true" : "";
 
-  const params = new URLSearchParams({ timespan, event_type: eventType });
+  const params = new URLSearchParams({ timespan_minutes: timespanMinutes, event_type: eventType });
   if (country) params.set("country", country);
 
   try {

@@ -32,7 +32,7 @@ async def get_filters():
 
 @app.get("/api/events")
 async def get_events(
-    timespan: str = Query(default="24h"),
+    timespan_minutes: int = Query(default=1440, ge=15, le=1440, description="Fenêtre temporelle en minutes (15 à 1440, soit 24h max)"),
     event_type: str = Query(default="all"),
     country: Optional[str] = Query(default=None),
     demo: bool = Query(default=False, description="Retourne des données factices sans appel réseau"),
@@ -41,6 +41,6 @@ async def get_events(
         return filter_demo_events(event_type=event_type, country=country)
     query = build_query(event_type=event_type, country=country)
     try:
-        return await fetch_conflict_events(query=query, timespan=timespan)
+        return await fetch_conflict_events(query=query, timespan_minutes=timespan_minutes)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Erreur GDELT: {exc}") from exc

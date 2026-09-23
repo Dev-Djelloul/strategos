@@ -49,17 +49,28 @@ def build_query(event_type: str = "all", country: Optional[str] = None) -> str:
     return query
 
 
-async def fetch_conflict_events(query: str = DEFAULT_QUERY, timespan: str = "24h") -> dict:
+# Un navigateur usuel envoie toujours un User-Agent ; certains WAF/CDN
+# renvoient une 404 générique aux requêtes qui en sont dépourvues (comme
+# le client HTTP par défaut d'httpx), ce qui ressemble à une mauvaise URL
+# alors que ce n'en est pas une.
+REQUEST_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; Strategos/0.1)"}
+
+
+async def fetch_conflict_events(query: str = DEFAULT_QUERY, timespan_minutes: int = 1440) -> dict:
     """Retourne un GeoJSON FeatureCollection d'événements géolocalisés.
 
-    timespan accepte le format GDELT: "24h", "7d", "1w", etc.
+    L'API GEO 2.0 de GDELT n'accepte le timespan qu'en minutes, de 15 à
+    1440 (24h max) - contrairement à l'API DOC 2.0 qui accepte "7d", "1w",
+    etc. `mode=PointData` est requis pour obtenir des points géolocalisés
+    individuels (les autres modes agrègent par pays/région).
     """
     params = {
         "query": query,
         "format": "geojson",
-        "timespan": timespan,
+        "mode": "PointData",
+        "timespan": max(15, min(timespan_minutes, 1440)),
     }
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    async with httpx.AsyncClient(timeout=15.0, headers=REQUEST_HEADERS) as client:
         response = await client.get(GDELT_GEO_URL, params=params)
         response.raise_for_status()
         return response.json()
