@@ -1,29 +1,50 @@
-const map = L.map("map", { worldCopyJump: true }).setView([20, 20], 2);
+// Pas de token Cesium Ion : on évite volontairement les services payants
+// (imagerie Bing, terrain haute-résolution) et on utilise à la place des
+// tuiles OpenStreetMap gratuites + une ellipsoïde sans relief. Le moteur
+// 3D de CesiumJS lui-même est open source et ne nécessite aucune clé.
+Cesium.Ion.defaultAccessToken = undefined;
 
-// OpenStreetMap standard : gratuit, sans clé API. Le filtre CSS (voir
-// style.css, classe .dark-tiles) inverse les couleurs pour simuler un
-// thème sombre sans dépendre d'un fournisseur de tuiles payant.
-L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  attribution: '&copy; OpenStreetMap contributors',
-  maxZoom: 19,
-  className: "dark-tiles",
-}).addTo(map);
+const viewer = new Cesium.Viewer("cesiumContainer", {
+  baseLayerPicker: false,
+  geocoder: false,
+  homeButton: true,
+  sceneModePicker: true,
+  navigationHelpButton: false,
+  animation: false,
+  timeline: false,
+  fullscreenButton: false,
+  infoBox: true,
+  selectionIndicator: true,
+  imageryProvider: new Cesium.OpenStreetMapImageryProvider({
+    url: "https://tile.openstreetmap.org/",
+  }),
+  terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+});
 
-let markersLayer = L.layerGroup().addTo(map);
+viewer.scene.globe.enableLighting = true;
+viewer.camera.flyHome(0);
 
 const statusEl = document.getElementById("status");
-const timespanEl = document.getElementById("timespan");
+const daysEl = document.getElementById("days");
 const countryEl = document.getElementById("country");
 const eventTypeEl = document.getElementById("event-type");
 const refreshBtn = document.getElementById("refresh");
 
 const EVENT_TYPE_LABELS = {
   all: "Tous",
-  airstrike: "Frappes aériennes",
-  ceasefire: "Cessez-le-feu / trêve",
-  offensive: "Offensive / incursion",
-  protest: "Manifestations / troubles",
-  casualties: "Victimes",
+  airstrike: "Frappes aériennes / tirs à distance",
+  offensive: "Batailles / offensives",
+  protest: "Manifestations",
+  casualties: "Violence contre civils",
+  ceasefire: "Développements stratégiques",
+};
+
+const EVENT_COLORS = {
+  airstrike: Cesium.Color.fromCssColorString("#e05a56"),
+  offensive: Cesium.Color.fromCssColorString("#c9302c"),
+  protest: Cesium.Color.fromCssColorString("#e0a13c"),
+  casualties: Cesium.Color.fromCssColorString("#8b1a1a"),
+  ceasefire: Cesium.Color.fromCssColorString("#4caf7d"),
 };
 
 function escapeHtml(str) {
@@ -59,14 +80,14 @@ async function loadFilters() {
 
 async function loadEvents() {
   statusEl.textContent = "Chargement…";
-  markersLayer.clearLayers();
+  viewer.entities.removeAll();
 
-  const timespanMinutes = timespanEl.value;
+  const days = daysEl.value;
   const country = countryEl.value;
   const eventType = eventTypeEl.value;
   const demo = document.getElementById("demo-toggle")?.checked ? "&demo=true" : "";
 
-  const params = new URLSearchParams({ timespan_minutes: timespanMinutes, event_type: eventType });
+  const params = new URLSearchParams({ days, event_type: eventType });
   if (country) params.set("country", country);
 
   try {
@@ -79,26 +100,36 @@ async function loadEvents() {
       const [lon, lat] = feature.geometry.coordinates;
       const props = feature.properties || {};
       const name = props.name || "Événement";
-      const count = props.count;
-      const marker = L.circleMarker([lat, lon], {
-        radius: 5,
-        color: "#c9302c",
-        fillColor: "#e05a56",
-        fillOpacity: 0.8,
-        weight: 1,
+      const color = EVENT_COLORS[props.event_type] || Cesium.Color.fromCssColorString("#e05a56");
+
+      const descriptionParts = [];
+      if (props.event_type) descriptionParts.push(`<strong>Type :</strong> ${escapeHtml(EVENT_TYPE_LABELS[props.event_type] || props.event_type)}`);
+      if (props.fatalities !== undefined && props.fatalities !== null) descriptionParts.push(`<strong>Victimes :</strong> ${escapeHtml(String(props.fatalities))}`);
+      if (props.event_date) descriptionParts.push(`<strong>Date :</strong> ${escapeHtml(props.event_date)}`);
+      if (props.count) descriptionParts.push(`<strong>Mentions :</strong> ${escapeHtml(String(props.count))}`);
+      if (props.notes) descriptionParts.push(`<p>${escapeHtml(props.notes)}</p>`);
+
+      viewer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(lon, lat),
+        point: {
+          pixelSize: 9,
+          color,
+          outlineColor: Cesium.Color.WHITE,
+          outlineWidth: 1,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+        name,
+        description: descriptionParts.join("<br/>"),
       });
-      marker.bindPopup(
-        `<strong>${escapeHtml(name)}</strong>` +
-          (count ? `<br/>Mentions: ${escapeHtml(String(count))}` : "")
-      );
-      marker.addTo(markersLayer);
     });
 
     const time = new Date().toLocaleTimeString("fr-FR");
     if (geojson.source === "demo_fallback") {
-      statusEl.textContent = `⚠️ GDELT indisponible — données démo affichées (${features.length}) — ${time}`;
+      statusEl.textContent = `⚠️ ACLED indisponible — données démo affichées (${features.length}) — ${time}`;
+    } else if (geojson.source === "demo") {
+      statusEl.textContent = `Mode démo — ${features.length} événement(s) — ${time}`;
     } else {
-      statusEl.textContent = `${features.length} événement(s) — mis à jour ${time}`;
+      statusEl.textContent = `${features.length} événement(s) ACLED — mis à jour ${time}`;
     }
   } catch (err) {
     statusEl.textContent = `Erreur de chargement (${err.message})`;
@@ -106,7 +137,7 @@ async function loadEvents() {
 }
 
 refreshBtn.addEventListener("click", loadEvents);
-timespanEl.addEventListener("change", loadEvents);
+daysEl.addEventListener("change", loadEvents);
 countryEl.addEventListener("change", loadEvents);
 eventTypeEl.addEventListener("change", loadEvents);
 

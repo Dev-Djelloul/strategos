@@ -1,7 +1,8 @@
-"""Jeu de données factice utilisé quand GDELT est inaccessible (réseau
-restreint) ou pour développer/démontrer l'UI sans dépendance externe.
-Chaque événement porte un pays (code FIPS, cf. gdelt.COUNTRY_CODES) et un
-type pour que les filtres fonctionnent aussi en mode démo."""
+"""Jeu de données factice utilisé quand ACLED est inaccessible (pas de
+compte configuré, ou service en panne) ou pour développer/démontrer l'UI
+sans dépendance externe. Chaque événement porte un pays (code, cf.
+acled.COUNTRIES) et un type pour que les filtres fonctionnent aussi en
+mode démo."""
 
 from typing import Optional
 
@@ -14,7 +15,7 @@ DEMO_EVENTS = {
             "properties": {
                 "name": "Zaporijjia, Ukraine (démo)",
                 "count": 42,
-                "country": "UP",
+                "country": "UA",
                 "event_type": "airstrike",
             },
         },
@@ -34,7 +35,7 @@ DEMO_EVENTS = {
             "properties": {
                 "name": "Gaza (démo)",
                 "count": 67,
-                "country": "IS",
+                "country": "IL",
                 "event_type": "casualties",
             },
         },
@@ -44,7 +45,7 @@ DEMO_EVENTS = {
             "properties": {
                 "name": "Khartoum, Soudan (démo)",
                 "count": 23,
-                "country": "SU",
+                "country": "SD",
                 "event_type": "protest",
             },
         },
@@ -64,7 +65,7 @@ DEMO_EVENTS = {
             "properties": {
                 "name": "Kyiv, Ukraine (démo)",
                 "count": 9,
-                "country": "UP",
+                "country": "UA",
                 "event_type": "ceasefire",
             },
         },

@@ -72,20 +72,15 @@ html, body {
   margin-left: auto;
 }
 
-#map {
+#cesiumContainer {
   height: calc(100vh - 108px);
   width: 100%;
 }
 
-.dark-tiles {
-  filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9);
+.cesium-infoBox {
+  background: var(--panel);
 }
 
-.leaflet-popup-content-wrapper {
-  background: var(--panel);
-  color: var(--text);
-}
-
-.leaflet-popup-tip {
-  background: var(--panel);
+.cesium-infoBox-title {
+  background: #21262d;
 }

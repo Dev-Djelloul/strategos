@@ -1,16 +1,36 @@
-# 🗺️ Strategos
+# 🌍 Strategos
 
-Carte interactive des conflits et tensions géopolitiques actuels, construite
+Globe 3D interactif des conflits et tensions géopolitiques actuels, construit
 pour apprendre la géo-visualisation de données et l'intégration d'API open
-data — backend FastAPI, carte Leaflet, sans clé API pour démarrer.
+data — backend FastAPI, globe CesiumJS, données ACLED.
 
-## Fonctionnalités (MVP)
+## Fonctionnalités
 
-- **Carte interactive** — fond de carte sombre, marqueurs cliquables par zone
-- **Données ouvertes** — [GDELT GEO 2.0 API](https://blog.gdeltproject.org/gdelt-geo-2-0-api-debuts/)
-  (gratuite, sans inscription), événements géolocalisés des dernières 24h/7j
+- **Globe 3D interactif** — CesiumJS, imagerie OpenStreetMap (aucune clé API
+  requise pour le globe lui-même), points cliquables avec détail
+- **Données** — [ACLED](https://acleddata.com/) (Armed Conflict Location &
+  Event Data), données qualifiées et documentées sur les événements de
+  conflit dans le monde. Inscription gratuite requise (usage
+  non-commercial/académique)
+- **Filtres** — par pays et par type d'événement (catégories réelles ACLED :
+  batailles, violence contre civils, explosions, manifestations,
+  développements stratégiques)
 - **Mode démo** — jeu de données factice pour développer/démontrer l'UI sans
-  dépendance réseau externe
+  compte ACLED ni dépendance réseau
+- **Fallback automatique** — si ACLED est indisponible ou les identifiants
+  absents, bascule silencieusement sur les données démo plutôt que de casser
+
+## Configurer ACLED
+
+1. Crée un compte gratuit sur https://acleddata.com/myacled
+2. Copie `.env.example` en `.env` et renseigne ton email/mot de passe :
+   ```bash
+   cp .env.example .env
+   ```
+3. Édite `.env` avec tes identifiants (ce fichier est ignoré par git, ne le
+   commit jamais)
+
+Sans configuration, l'app fonctionne quand même en mode démo/fallback.
 
 ## Architecture
 
@@ -18,10 +38,10 @@ data — backend FastAPI, carte Leaflet, sans clé API pour démarrer.
 app/
   main.py              # routes FastAPI (page + API JSON)
   services/
-    gdelt.py           # client GDELT GEO 2.0
-    demo_data.py        # données factices (mode démo)
-  templates/index.html # page Leaflet
-  static/app.js         # logique carte (fetch + rendu des marqueurs)
+    acled.py           # client ACLED (OAuth + requêtes)
+    demo_data.py        # données factices (mode démo / fallback)
+  templates/index.html # page globe CesiumJS
+  static/app.js         # logique globe (fetch + rendu des points)
   static/style.css
 ```
 
@@ -37,7 +57,8 @@ Puis ouvrir http://127.0.0.1:8000
 
 ## Roadmap
 
-- [ ] Filtres par type d'événement (CAMEO codes) et par pays
 - [ ] Historique / timeline des événements (pas seulement l'instantané)
-- [ ] Source alternative ACLED (données plus qualifiées, clé API requise)
-- [ ] Déploiement (Cloudflare Pages / Workers pour le frontend, backend à héberger)
+- [ ] Couches supplémentaires sur le globe (zones de contrôle, routes
+  logistiques, bases militaires — data à définir)
+- [ ] Déploiement (Cloudflare Pages / Workers pour le frontend, backend à
+  héberger)

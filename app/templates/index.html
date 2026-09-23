@@ -3,24 +3,24 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Strategos — Carte des conflits</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <title>Strategos — Globe des conflits</title>
+  <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Widgets/widgets.css" />
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
   <header class="topbar">
     <h1>Strategos</h1>
-    <p class="subtitle">Carte des conflits et tensions — données GDELT, actualité 24h</p>
+    <p class="subtitle">Globe des conflits et tensions — données ACLED</p>
   </header>
 
   <div class="controls">
-    <label for="timespan">Période :</label>
-    <select id="timespan">
-      <option value="15">15 dernières minutes</option>
-      <option value="60">Dernière heure</option>
-      <option value="360">6 dernières heures</option>
-      <option value="1440" selected>Dernières 24h</option>
+    <label for="days">Période :</label>
+    <select id="days">
+      <option value="1">Dernières 24h</option>
+      <option value="7">7 derniers jours</option>
+      <option value="30">30 derniers jours</option>
     </select>
+
     <label for="country">Pays :</label>
     <select id="country">
       <option value="">Tous</option>
@@ -36,9 +36,9 @@
     <span id="status" class="status"></span>
   </div>
 
-  <div id="map"></div>
+  <div id="cesiumContainer"></div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Cesium.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>
