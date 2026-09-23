@@ -6,6 +6,8 @@ CAMEO) sur cette API - contrairement à la base Event Database complète.
 On simule donc un "type d'événement" par des mots-clés ciblés ajoutés à la
 requête plein texte. Le filtre pays utilise l'opérateur `sourcecountry:`
 de GDELT, qui attend des codes FIPS 10-4 (et non ISO 3166)."""
+from typing import Optional
+
 import httpx
 
 GDELT_GEO_URL = "https://api.gdeltproject.org/api/v2/geo/geo"
@@ -39,7 +41,7 @@ COUNTRY_CODES = {
 }
 
 
-def build_query(event_type: str = "all", country: str | None = None) -> str:
+def build_query(event_type: str = "all", country: Optional[str] = None) -> str:
     """Construit la requête plein texte GDELT à partir des filtres UI."""
     query = EVENT_TYPE_KEYWORDS.get(event_type, EVENT_TYPE_KEYWORDS["all"])
     if country and country in COUNTRY_CODES:

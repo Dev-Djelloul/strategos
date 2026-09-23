@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
@@ -33,7 +34,7 @@ async def get_filters():
 async def get_events(
     timespan: str = Query(default="24h"),
     event_type: str = Query(default="all"),
-    country: str | None = Query(default=None),
+    country: Optional[str] = Query(default=None),
     demo: bool = Query(default=False, description="Retourne des données factices sans appel réseau"),
 ):
     if demo:

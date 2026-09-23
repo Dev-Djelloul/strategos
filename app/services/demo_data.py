@@ -3,6 +3,8 @@ restreint) ou pour développer/démontrer l'UI sans dépendance externe.
 Chaque événement porte un pays (code FIPS, cf. gdelt.COUNTRY_CODES) et un
 type pour que les filtres fonctionnent aussi en mode démo."""
 
+from typing import Optional
+
 DEMO_EVENTS = {
     "type": "FeatureCollection",
     "features": [
@@ -70,7 +72,7 @@ DEMO_EVENTS = {
 }
 
 
-def filter_demo_events(event_type: str = "all", country: str | None = None) -> dict:
+def filter_demo_events(event_type: str = "all", country: Optional[str] = None) -> dict:
     features = DEMO_EVENTS["features"]
     if event_type and event_type != "all":
         features = [f for f in features if f["properties"]["event_type"] == event_type]
