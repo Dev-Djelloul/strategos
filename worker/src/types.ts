@@ -1,6 +1,6 @@
 export interface Env {
   CACHE: KVNamespace;
-  ASSETS: Fetcher;
+  ASSETS?: Fetcher;
   ACLED_EMAIL?: string;
   ACLED_PASSWORD?: string;
   UCDP_ACCESS_TOKEN?: string;

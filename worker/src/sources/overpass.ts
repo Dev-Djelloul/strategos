@@ -6,6 +6,7 @@ import { cachedFetch, errMessage } from "../cache.ts";
 
 const OVERPASS_URLS = [
   "https://overpass-api.de/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
 ];
 const CACHE_TTL_SECONDS = 6 * 3600;
@@ -38,7 +39,7 @@ function toGeoJson(elements: OsmElement[], nameFallback: string): FeatureCollect
 }
 
 async function queryMirrors(queryQl: string): Promise<{ elements?: OsmElement[]; remark?: string }> {
-  let last: unknown = new Error("Overpass indisponible");
+  const failures: string[] = [];
   for (const url of OVERPASS_URLS) {
     try {
       const res = await fetch(url, {
@@ -54,10 +55,10 @@ async function queryMirrors(queryQl: string): Promise<{ elements?: OsmElement[];
       if ((payload.remark ?? "").includes("runtime error")) throw new Error(payload.remark);
       return payload;
     } catch (e) {
-      last = new Error(`${new URL(url).host} : ${errMessage(e)}`);
+      failures.push(`${new URL(url).host} : ${errMessage(e)}`);
     }
   }
-  throw last;
+  throw new Error(failures.join(" ; "));
 }
 
 export function queryOverpass(

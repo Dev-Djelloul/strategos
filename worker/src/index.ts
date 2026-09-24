@@ -89,7 +89,7 @@ export default {
       const status = e instanceof WarmingUp ? 503 : 500;
       return json({ detail: errMessage(e) }, status);
     }
-    return env.ASSETS.fetch(request);
+    return env.ASSETS ? env.ASSETS.fetch(request) : new Response("Not found", { status: 404 });
   },
 
   /** Cron (toutes les 15 min) : collecte GDELT et préchauffage des couches
