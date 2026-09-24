@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.services.acled import COUNTRIES, EVENT_TYPE_MAP, fetch_conflict_events
+from app.services.acled import COUNTRIES, COUNTRY_BOUNDS, EVENT_TYPE_MAP, fetch_conflict_events
 from app.services.conflicts import PRIORITY, fetch_conflicts
 from app.services.gdelt import fetch_gdelt_events
 from app.services.infrastructure import fetch_infrastructure_sites
@@ -96,7 +96,7 @@ async def get_filters():
     """Options disponibles pour les filtres pays / type d'événement."""
     return {
         "event_types": list(EVENT_TYPE_MAP.keys()),
-        "countries": [{"code": code, "name": name} for code, name in COUNTRIES.items()],
+        "countries": [{"code": code, "name": name, "bbox": COUNTRY_BOUNDS.get(code)} for code, name in COUNTRIES.items()],
     }
 
 

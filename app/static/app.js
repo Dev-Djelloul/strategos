@@ -96,9 +96,22 @@ REGIONS.forEach((r, i) => {
   opt.textContent = r.name;
   regionEl.appendChild(opt);
 });
+// Cadre la caméra sur un rectangle [ouest, sud, est, nord] en vue inclinée :
+// la distance est déduite de la taille réelle du cadre.
+function frameBBox([w, s, e, n]) {
+  const center = Cesium.Cartesian3.fromDegrees((w + e) / 2, (s + n) / 2, 0);
+  const corner = Cesium.Cartesian3.fromDegrees(e, n, 0);
+  const radius = Cesium.Cartesian3.distance(center, corner);
+  viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(center, radius), {
+    duration: 2.5,
+    offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-50), radius * 2.4),
+  });
+}
+
 regionEl.addEventListener("change", () => {
   const r = REGIONS[Number(regionEl.value)];
   if (!r) return;
+  countryEl.value = ""; // le cadre de la région remplace celui du pays
   setZone(r.bbox || null); // "Monde" : pas de cadre
   viewer.camera.flyToBoundingSphere(
     new Cesium.BoundingSphere(Cesium.Cartesian3.fromDegrees(r.lon, r.lat, 0), r.range / 4),
@@ -306,13 +319,16 @@ async function apiJson(url) {
   return res.json();
 }
 
+const countryBounds = {};
+
 async function loadFilters() {
   try {
     const res = await fetch("/api/filters");
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const filters = await res.json();
 
-    filters.countries.forEach(({ code, name }) => {
+    filters.countries.forEach(({ code, name, bbox }) => {
+      if (bbox) countryBounds[code] = bbox;
       const opt = document.createElement("option");
       opt.value = code;
       opt.textContent = name;
@@ -602,7 +618,15 @@ document.getElementById("press-toggle").addEventListener("change", (e) => {
   showPressOnly = e.target.checked;
   applyTimeline();
 });
-countryEl.addEventListener("change", loadEvents);
+countryEl.addEventListener("change", () => {
+  // Choisir un pays cadre la caméra dessus et limite toutes les couches à
+  // son cadre ; "Tous" retire le cadre.
+  const bbox = countryBounds[countryEl.value];
+  regionEl.value = "";
+  setZone(bbox || null);
+  if (bbox) frameBBox(bbox);
+  loadEvents();
+});
 eventTypeEl.addEventListener("change", loadEvents);
 nuclearToggleEl.addEventListener("change", loadNuclearSites);
 militaryToggleEl.addEventListener("change", loadMilitarySites);
@@ -679,6 +703,10 @@ document.getElementById("zone-view").addEventListener("click", () => {
 document.getElementById("zone-clear").addEventListener("click", () => {
   setZone(null);
   regionEl.value = "";
+  if (countryEl.value) {
+    countryEl.value = "";
+    loadEvents();
+  }
 });
 
 loadFilters().then(loadAll).then(syncToolbarHeight);

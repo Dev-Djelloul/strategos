@@ -43,6 +43,21 @@ COUNTRIES = {
     "YE": "Yemen",
 }
 
+# Cadres géographiques [ouest, sud, est, nord] pour cadrer la caméra et
+# limiter l'affichage quand un pays est choisi dans le filtre.
+COUNTRY_BOUNDS = {
+    "UA": [22.1, 44.3, 40.3, 52.4],
+    "RU": [19.0, 41.0, 180.0, 82.0],
+    "IL": [34.2, 29.4, 35.9, 33.4],
+    "SY": [35.7, 32.3, 42.4, 37.3],
+    "SD": [21.8, 8.7, 38.6, 22.2],
+    "ML": [-12.3, 10.1, 4.3, 25.0],
+    "AF": [60.5, 29.4, 74.9, 38.5],
+    "IR": [44.0, 25.0, 63.4, 39.8],
+    "IQ": [38.8, 29.1, 48.6, 37.4],
+    "YE": [42.5, 12.1, 54.5, 19.0],
+}
+
 
 class AcledCredentialsMissing(RuntimeError):
     """Levée quand ACLED_EMAIL / ACLED_PASSWORD ne sont pas configurés."""
