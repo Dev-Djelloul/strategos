@@ -9,6 +9,8 @@ from fastapi.templating import Jinja2Templates
 
 from app.services.acled import COUNTRIES, EVENT_TYPE_MAP, fetch_conflict_events
 from app.services.demo_data import filter_demo_events
+from app.services.nuclear import fetch_nuclear_sites
+from app.services.nuclear_demo_data import NUCLEAR_DEMO_SITES
 
 load_dotenv()
 
@@ -54,6 +56,25 @@ async def get_events(
         # réseau : on dégrade proprement vers les données démo plutôt que
         # de casser l'app.
         result = filter_demo_events(event_type=event_type, country=country)
+        result["source"] = "demo_fallback"
+        result["fallback_reason"] = str(exc)
+        return result
+
+
+@app.get("/api/nuclear-sites")
+async def get_nuclear_sites(demo: bool = Query(default=False)):
+    """Installations nucléaires civiles déclarées (source: Wikidata)."""
+    if demo:
+        result = dict(NUCLEAR_DEMO_SITES)
+        result["source"] = "demo"
+        return result
+
+    try:
+        result = await fetch_nuclear_sites()
+        result["source"] = "wikidata"
+        return result
+    except Exception as exc:
+        result = dict(NUCLEAR_DEMO_SITES)
         result["source"] = "demo_fallback"
         result["fallback_reason"] = str(exc)
         return result

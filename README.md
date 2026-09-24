@@ -19,6 +19,11 @@ data — backend FastAPI, globe CesiumJS, données ACLED.
   compte ACLED ni dépendance réseau
 - **Fallback automatique** — si ACLED est indisponible ou les identifiants
   absents, bascule silencieusement sur les données démo plutôt que de casser
+- **Couche sites nucléaires** — installations civiles déclarées (centrales,
+  sites sous garanties AIEA), source [Wikidata](https://www.wikidata.org/)
+  (SPARQL public, sans clé), activable/désactivable indépendamment des
+  conflits. Volontairement limité aux sites civils publics et documentés,
+  pas de tentative de localiser des installations militaires non déclarées
 
 ## Configurer ACLED
 
@@ -39,10 +44,14 @@ app/
   main.py              # routes FastAPI (page + API JSON)
   services/
     acled.py           # client ACLED (OAuth + requêtes)
-    demo_data.py        # données factices (mode démo / fallback)
+    demo_data.py        # données factices conflits (mode démo / fallback)
+    nuclear.py          # client Wikidata (sites nucléaires civils)
+    nuclear_demo_data.py # données factices nucléaire (fallback)
   templates/index.html # page globe CesiumJS
-  static/app.js         # logique globe (fetch + rendu des points)
+  static/app.js         # logique globe (fetch + rendu des couches)
   static/style.css
+scripts/
+  test_acled_auth.py   # diagnostic auth ACLED (hors app, usage manuel)
 ```
 
 ## Démarrage
@@ -59,6 +68,6 @@ Puis ouvrir http://127.0.0.1:8000
 
 - [ ] Historique / timeline des événements (pas seulement l'instantané)
 - [ ] Couches supplémentaires sur le globe (zones de contrôle, routes
-  logistiques, bases militaires — data à définir)
+  logistiques — data à définir)
 - [ ] Déploiement (Cloudflare Pages / Workers pour le frontend, backend à
   héberger)

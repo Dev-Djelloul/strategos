@@ -24,11 +24,21 @@ const viewer = new Cesium.Viewer("cesiumContainer", {
 viewer.scene.globe.enableLighting = true;
 viewer.camera.flyHome(0);
 
+// Chaque couche de données vit dans son propre DataSource : on peut la
+// rafraîchir, la vider ou l'afficher/masquer indépendamment des autres
+// (ex: actualiser les conflits sans effacer les sites nucléaires).
+const conflictsLayer = new Cesium.CustomDataSource("conflicts");
+const nuclearLayer = new Cesium.CustomDataSource("nuclear");
+viewer.dataSources.add(conflictsLayer);
+viewer.dataSources.add(nuclearLayer);
+
 const statusEl = document.getElementById("status");
 const daysEl = document.getElementById("days");
 const countryEl = document.getElementById("country");
 const eventTypeEl = document.getElementById("event-type");
 const refreshBtn = document.getElementById("refresh");
+const demoToggleEl = document.getElementById("demo-toggle");
+const nuclearToggleEl = document.getElementById("nuclear-toggle");
 
 const EVENT_TYPE_LABELS = {
   all: "Tous",
@@ -46,6 +56,8 @@ const EVENT_COLORS = {
   casualties: Cesium.Color.fromCssColorString("#8b1a1a"),
   ceasefire: Cesium.Color.fromCssColorString("#4caf7d"),
 };
+
+const NUCLEAR_COLOR = Cesium.Color.fromCssColorString("#f4d03f");
 
 function escapeHtml(str) {
   const div = document.createElement("div");
@@ -80,12 +92,12 @@ async function loadFilters() {
 
 async function loadEvents() {
   statusEl.textContent = "Chargement…";
-  viewer.entities.removeAll();
+  conflictsLayer.entities.removeAll();
 
   const days = daysEl.value;
   const country = countryEl.value;
   const eventType = eventTypeEl.value;
-  const demo = document.getElementById("demo-toggle")?.checked ? "&demo=true" : "";
+  const demo = demoToggleEl?.checked ? "&demo=true" : "";
 
   const params = new URLSearchParams({ days, event_type: eventType });
   if (country) params.set("country", country);
@@ -109,7 +121,7 @@ async function loadEvents() {
       if (props.count) descriptionParts.push(`<strong>Mentions :</strong> ${escapeHtml(String(props.count))}`);
       if (props.notes) descriptionParts.push(`<p>${escapeHtml(props.notes)}</p>`);
 
-      viewer.entities.add({
+      conflictsLayer.entities.add({
         position: Cesium.Cartesian3.fromDegrees(lon, lat),
         point: {
           pixelSize: 9,
@@ -136,9 +148,55 @@ async function loadEvents() {
   }
 }
 
-refreshBtn.addEventListener("click", loadEvents);
+async function loadNuclearSites() {
+  nuclearLayer.entities.removeAll();
+  if (!nuclearToggleEl?.checked) return;
+
+  const demo = demoToggleEl?.checked ? "?demo=true" : "";
+
+  try {
+    const res = await fetch(`/api/nuclear-sites${demo}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const geojson = await res.json();
+
+    const features = geojson.features || [];
+    features.forEach((feature) => {
+      const [lon, lat] = feature.geometry.coordinates;
+      const props = feature.properties || {};
+      const name = props.name || "Site nucléaire";
+
+      const descriptionParts = [];
+      if (props.country) descriptionParts.push(`<strong>Pays :</strong> ${escapeHtml(props.country)}`);
+      if (props.status) descriptionParts.push(`<strong>Statut :</strong> ${escapeHtml(props.status)}`);
+
+      nuclearLayer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(lon, lat),
+        point: {
+          pixelSize: 10,
+          color: NUCLEAR_COLOR,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 2,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+        name: `☢️ ${name}`,
+        description: descriptionParts.join("<br/>"),
+      });
+    });
+  } catch (err) {
+    console.error("Erreur chargement sites nucléaires:", err);
+  }
+}
+
+function loadAll() {
+  loadEvents();
+  loadNuclearSites();
+}
+
+refreshBtn.addEventListener("click", loadAll);
 daysEl.addEventListener("change", loadEvents);
 countryEl.addEventListener("change", loadEvents);
 eventTypeEl.addEventListener("change", loadEvents);
+demoToggleEl.addEventListener("change", loadAll);
+nuclearToggleEl.addEventListener("change", loadNuclearSites);
 
-loadFilters().then(loadEvents);
+loadFilters().then(loadAll);
