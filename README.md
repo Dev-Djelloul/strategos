@@ -116,7 +116,7 @@ npm test                  # tests unitaires
 
 ```bash
 cd worker
-npx wrangler kv namespace create CACHE      # copier l'id dans wrangler.jsonc
+npx wrangler kv namespace create strategos-cache  # copier l'id dans wrangler.jsonc
 npx wrangler secret put CESIUM_ION_TOKEN    # + ACLED_EMAIL, ACLED_PASSWORD, UCDP_ACCESS_TOKEN
 npx wrangler deploy
 ```

@@ -10,8 +10,8 @@
     "run_worker_first": ["/api/*", "/methodologie", "/config.js"]
   },
   "kv_namespaces": [
-    // Créer avec : wrangler kv namespace create CACHE  (puis coller l'id ici)
-    { "binding": "CACHE", "id": "REPLACE_WITH_KV_ID" }
+    // Namespace "strategos-cache" (dédié : les autres namespaces du compte servent à d autres projets)
+    { "binding": "CACHE", "id": "d413140b8b07473882c97623e22890f9" }
   ],
   "triggers": {
     // Toutes les 15 min : collecte GDELT + préchauffage des couches lentes.
