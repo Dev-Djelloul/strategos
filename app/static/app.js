@@ -27,8 +27,8 @@ const viewer = new Cesium.Viewer("cesiumContainer", {
   terrainProvider: new Cesium.EllipsoidTerrainProvider(),
 });
 
-// Couche de référence superposée (transparente) : frontières, noms de
-// pays, villes, routes principales - gratuite et sans clé également.
+// Couche de référence superposée : frontières, noms de pays, villes -
+// gratuite et sans clé également.
 viewer.imageryLayers.addImageryProvider(
   new Cesium.UrlTemplateImageryProvider({
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
@@ -37,7 +37,25 @@ viewer.imageryLayers.addImageryProvider(
   })
 );
 
+// Couche routes/rail/transport - plus de détail au fur et à mesure du
+// zoom (visible surtout en vue rapprochée sur une ville/région).
+viewer.imageryLayers.addImageryProvider(
+  new Cesium.UrlTemplateImageryProvider({
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
+    credit: "Esri",
+    maximumLevel: 19,
+  })
+);
+
 viewer.scene.globe.enableLighting = true;
+
+// Horloge synchronisée sur l'heure système réelle, qui avance en continu
+// (au lieu de rester figée sur l'instant du chargement de la page) : le
+// terminateur jour/nuit sur le globe suit ainsi le soleil en temps réel.
+viewer.clock.shouldAnimate = true;
+viewer.clock.clockStep = Cesium.ClockStep.SYSTEM_CLOCK;
+viewer.clock.multiplier = 1;
+
 viewer.camera.flyHome(0);
 
 // Chaque couche de données vit dans son propre DataSource : on peut la
@@ -216,3 +234,40 @@ demoToggleEl.addEventListener("change", loadAll);
 nuclearToggleEl.addEventListener("change", loadNuclearSites);
 
 loadFilters().then(loadAll);
+
+// Horloge mondiale (HUD) : UTC + quelques fuseaux stratégiques, mise à
+// jour chaque seconde via l'API Intl native du navigateur (aucune
+// dépendance ni service externe).
+const WORLD_CLOCK_CITIES = [
+  { label: "Washington", tz: "America/New_York" },
+  { label: "Londres", tz: "Europe/London" },
+  { label: "Kyiv", tz: "Europe/Kyiv" },
+  { label: "Moscou", tz: "Europe/Moscow" },
+  { label: "Jérusalem", tz: "Asia/Jerusalem" },
+  { label: "Pékin", tz: "Asia/Shanghai" },
+];
+
+const clockUtcEl = document.getElementById("clock-utc-time");
+const clockCitiesEl = document.getElementById("clock-cities");
+
+if (clockCitiesEl) {
+  clockCitiesEl.innerHTML = WORLD_CLOCK_CITIES.map(
+    (c) => `<span class="world-clock-city" data-tz="${c.tz}"><strong>--:--</strong> ${escapeHtml(c.label)}</span>`
+  ).join("");
+}
+
+function updateWorldClock() {
+  const now = new Date();
+  if (clockUtcEl) {
+    clockUtcEl.textContent = now.toISOString().substring(11, 19);
+  }
+  clockCitiesEl?.querySelectorAll("[data-tz]").forEach((el) => {
+    const tz = el.getAttribute("data-tz");
+    const time = new Intl.DateTimeFormat("fr-FR", { timeZone: tz, hour: "2-digit", minute: "2-digit" }).format(now);
+    const strong = el.querySelector("strong");
+    if (strong) strong.textContent = time;
+  });
+}
+
+updateWorldClock();
+setInterval(updateWorldClock, 1000);

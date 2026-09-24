@@ -54,7 +54,15 @@
     </div>
   </div>
 
-  <div id="cesiumContainer"></div>
+  <div id="cesiumContainer">
+    <div id="world-clock" class="world-clock">
+      <div class="world-clock-utc">
+        <span id="clock-utc-time">--:--:--</span>
+        <span class="world-clock-utc-label">UTC</span>
+      </div>
+      <div class="world-clock-cities" id="clock-cities"></div>
+    </div>
+  </div>
 
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Cesium.js"></script>
   <script src="/static/app.js"></script>
