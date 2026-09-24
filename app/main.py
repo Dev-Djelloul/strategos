@@ -9,9 +9,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.services.acled import COUNTRIES, EVENT_TYPE_MAP, fetch_conflict_events
+from app.services.gdelt import fetch_gdelt_events
 from app.services.infrastructure import fetch_infrastructure_sites
 from app.services.military import fetch_military_sites
 from app.services.nuclear import fetch_nuclear_sites
+from app.services.ucdp import fetch_ucdp_events
 
 load_dotenv()
 
@@ -63,6 +65,26 @@ async def get_events(
     country: Optional[str] = Query(default=None),
 ):
     return await _layer_response("acled", lambda: fetch_conflict_events(event_type=event_type, country=country, days=days))
+
+
+@app.get("/api/ucdp-events")
+async def get_ucdp_events(
+    days: int = Query(default=30, ge=1, le=90),
+    event_type: str = Query(default="all"),
+    country: Optional[str] = Query(default=None),
+):
+    """Événements géoréférencés UCDP GED (Uppsala), jeton requis."""
+    return await _layer_response("ucdp", lambda: fetch_ucdp_events(event_type=event_type, country=country, days=days))
+
+
+@app.get("/api/gdelt-events")
+async def get_gdelt_events(
+    days: int = Query(default=1, ge=1, le=90),
+    event_type: str = Query(default="all"),
+    country: Optional[str] = Query(default=None),
+):
+    """Événements de violence détectés dans la presse mondiale (GDELT, non vérifiés)."""
+    return await _layer_response("gdelt", lambda: fetch_gdelt_events(event_type=event_type, country=country, days=days))
 
 
 @app.get("/api/nuclear-sites")

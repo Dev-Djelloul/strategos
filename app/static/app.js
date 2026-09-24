@@ -22,7 +22,7 @@ const terrainProvider = ionToken
 
 const viewer = new Cesium.Viewer("cesiumContainer", {
   baseLayerPicker: false,
-  geocoder: false,
+  geocoder: Boolean(ionToken), // recherche de lieux (géocodeur Cesium Ion)
   homeButton: true,
   sceneModePicker: true,
   navigationHelpButton: false,
@@ -72,6 +72,71 @@ viewer.clock.multiplier = 1;
 
 viewer.camera.flyHome(0);
 
+// Navigation "Google Earth" : régions stratégiques pré-cadrées avec une
+// vue inclinée (perspective 3D plutôt que vue à la verticale). Le moteur
+// de recherche de lieux (loupe en haut à droite du globe) complète.
+const REGIONS = [
+  { name: "Ukraine", lon: 31.5, lat: 48.5, range: 1100000 },
+  { name: "Gaza / Israël / Liban", lon: 35.0, lat: 32.0, range: 350000 },
+  { name: "Syrie", lon: 38.0, lat: 35.0, range: 700000 },
+  { name: "Soudan", lon: 30.0, lat: 15.5, range: 1500000 },
+  { name: "Yémen / mer Rouge", lon: 44.0, lat: 15.0, range: 1200000 },
+  { name: "Sahel (Mali)", lon: -2.0, lat: 15.0, range: 1500000 },
+  { name: "Afghanistan", lon: 66.0, lat: 34.0, range: 1200000 },
+  { name: "Iran / Golfe", lon: 53.0, lat: 30.5, range: 1800000 },
+  { name: "Taïwan / mer de Chine", lon: 121.0, lat: 24.0, range: 1000000 },
+  { name: "Corée", lon: 127.5, lat: 37.5, range: 900000 },
+  { name: "Monde", lon: 10.0, lat: 20.0, range: 22000000, pitch: -90 },
+];
+
+const regionEl = document.getElementById("region");
+REGIONS.forEach((r, i) => {
+  const opt = document.createElement("option");
+  opt.value = String(i);
+  opt.textContent = r.name;
+  regionEl.appendChild(opt);
+});
+regionEl.addEventListener("change", () => {
+  const r = REGIONS[Number(regionEl.value)];
+  if (!r) return;
+  viewer.camera.flyToBoundingSphere(
+    new Cesium.BoundingSphere(Cesium.Cartesian3.fromDegrees(r.lon, r.lat, 0), r.range / 4),
+    {
+      duration: 2.5,
+      offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(r.pitch ?? -40), r.range),
+    }
+  );
+});
+
+// Villes 3D photoréalistes (maillage Google via Cesium Ion) : chargé à la
+// demande car lourd. Il remplace le globe (imagerie + relief) tant qu'il
+// est actif ; on restaure le globe classique en le décochant.
+let photo3dTileset = null;
+const photo3dToggleEl = document.getElementById("photo3d-toggle");
+if (!ionToken) {
+  photo3dToggleEl.disabled = true;
+  photo3dToggleEl.parentElement.title = "Nécessite un token Cesium Ion (CESIUM_ION_TOKEN)";
+}
+photo3dToggleEl.addEventListener("change", async () => {
+  try {
+    if (photo3dToggleEl.checked) {
+      if (!photo3dTileset) {
+        photo3dTileset = await Cesium.createGooglePhotorealistic3DTileset();
+        viewer.scene.primitives.add(photo3dTileset);
+      }
+      photo3dTileset.show = true;
+      viewer.scene.globe.show = false;
+    } else {
+      if (photo3dTileset) photo3dTileset.show = false;
+      viewer.scene.globe.show = true;
+    }
+  } catch (err) {
+    photo3dToggleEl.checked = false;
+    viewer.scene.globe.show = true;
+    statusEl.textContent = `⚠️ Villes 3D indisponibles — ${err.message || err}`;
+  }
+});
+
 // La barre d'outils se replie/déplie avec une transition CSS ; Cesium ne
 // redétecte pas automatiquement le changement de taille de son conteneur
 // dans ce cas (pas d'événement resize navigateur), d'où cet observer.
@@ -80,11 +145,17 @@ new ResizeObserver(() => viewer.resize()).observe(document.getElementById("cesiu
 // Chaque couche de données vit dans son propre DataSource : on peut la
 // rafraîchir, la vider ou l'afficher/masquer indépendamment des autres
 // (ex: actualiser les conflits sans effacer les sites nucléaires).
-const conflictsLayer = new Cesium.CustomDataSource("conflicts");
+// Une couche par source de conflits : ACLED (données qualifiées), UCDP
+// (référence académique) et GDELT (presse mondiale, non vérifié).
+const EVENT_SOURCES = [
+  { key: "acled", label: "ACLED", endpoint: "/api/events", toggleId: "acled-toggle", badgeId: "acled-badge", layer: new Cesium.CustomDataSource("acled") },
+  { key: "ucdp", label: "UCDP", endpoint: "/api/ucdp-events", toggleId: "ucdp-toggle", badgeId: "ucdp-badge", layer: new Cesium.CustomDataSource("ucdp") },
+  { key: "gdelt", label: "GDELT", endpoint: "/api/gdelt-events", toggleId: "gdelt-toggle", badgeId: "gdelt-badge", layer: new Cesium.CustomDataSource("gdelt") },
+];
 const nuclearLayer = new Cesium.CustomDataSource("nuclear");
 const militaryLayer = new Cesium.CustomDataSource("military");
 const infrastructureLayer = new Cesium.CustomDataSource("infrastructure");
-viewer.dataSources.add(conflictsLayer);
+EVENT_SOURCES.forEach((src) => viewer.dataSources.add(src.layer));
 viewer.dataSources.add(nuclearLayer);
 viewer.dataSources.add(militaryLayer);
 viewer.dataSources.add(infrastructureLayer);
@@ -208,16 +279,16 @@ function applyTimeline() {
   if (!timelineStart) return;
   const cutoff = timelineCutoff();
   timelineLabel.textContent = `jusqu'au ${cutoff}`;
-  conflictsLayer.entities.values.forEach((entity) => {
+  EVENT_SOURCES.forEach(({ layer }) => layer.entities.values.forEach((entity) => {
     const date = entity.properties?.event_date?.getValue();
     entity.show = !date || date <= cutoff;
-  });
+  }));
 }
 
-function setupTimeline(features, days) {
+function setupTimeline(days) {
   stopTimelinePlayback();
-  const dated = features.filter((f) => f.properties?.event_date);
-  if (!dated.length) {
+  const hasDated = EVENT_SOURCES.some(({ layer }) => layer.entities.values.some((e) => e.properties?.event_date?.getValue()));
+  if (!hasDated) {
     timelineStart = null;
     timelineEl.hidden = true;
     return;
@@ -247,35 +318,33 @@ timelinePlayBtn.addEventListener("click", () => {
   }, 400);
 });
 
-async function loadEvents() {
-  statusEl.textContent = "Chargement…";
-  conflictsLayer.entities.removeAll();
-
-  const days = daysEl.value;
-  const country = countryEl.value;
-  const eventType = eventTypeEl.value;
-
-  const params = new URLSearchParams({ days, event_type: eventType });
-  if (country) params.set("country", country);
+async function loadEventSource(src, params) {
+  src.layer.entities.removeAll();
+  const toggle = document.getElementById(src.toggleId);
+  if (!toggle?.checked) {
+    setLayerBadge(src.badgeId);
+    return 0;
+  }
 
   try {
-    const geojson = await apiJson(`/api/events?${params.toString()}`);
-
+    const geojson = await apiJson(`${src.endpoint}?${params.toString()}`);
     const features = geojson.features || [];
     features.forEach((feature) => {
       const [lon, lat] = feature.geometry.coordinates;
       const props = feature.properties || {};
-      const name = props.name || "Événement";
       const color = EVENT_COLORS[props.event_type] || Cesium.Color.fromCssColorString("#e05a56");
 
-      const descriptionParts = [];
-      if (props.event_type) descriptionParts.push(`<strong>Type :</strong> ${escapeHtml(EVENT_TYPE_LABELS[props.event_type] || props.event_type)}`);
-      if (props.fatalities !== undefined && props.fatalities !== null) descriptionParts.push(`<strong>Victimes :</strong> ${escapeHtml(String(props.fatalities))}`);
-      if (props.event_date) descriptionParts.push(`<strong>Date :</strong> ${escapeHtml(props.event_date)}`);
-      if (props.count) descriptionParts.push(`<strong>Mentions :</strong> ${escapeHtml(String(props.count))}`);
-      if (props.notes) descriptionParts.push(`<p>${escapeHtml(props.notes)}</p>`);
+      const parts = [`<strong>Source :</strong> ${src.label}`];
+      if (props.event_type) parts.push(`<strong>Type :</strong> ${escapeHtml(EVENT_TYPE_LABELS[props.event_type] || props.event_type)}`);
+      if (props.fatalities !== undefined && props.fatalities !== null) parts.push(`<strong>Victimes :</strong> ${escapeHtml(String(props.fatalities))}`);
+      if (props.event_date) parts.push(`<strong>Date :</strong> ${escapeHtml(props.event_date)}`);
+      if (props.count) parts.push(`<strong>Mentions :</strong> ${escapeHtml(String(props.count))}`);
+      if (props.notes) parts.push(`<p>${escapeHtml(props.notes)}</p>`);
+      if (/^https?:\/\//.test(props.source_url || "")) {
+        parts.push(`<a href="${escapeHtml(props.source_url)}" target="_blank" rel="noopener noreferrer">Article source</a>`);
+      }
 
-      conflictsLayer.entities.add({
+      src.layer.entities.add({
         position: Cesium.Cartesian3.fromDegrees(lon, lat),
         point: {
           pixelSize: 9,
@@ -284,20 +353,30 @@ async function loadEvents() {
           outlineWidth: 1,
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
         },
-        name,
-        description: descriptionParts.join("<br/>"),
+        name: props.name || "Événement",
+        description: parts.join("<br/>"),
         properties: { event_date: props.event_date || null },
       });
     });
-
-    setupTimeline(features, days);
-
-    const time = new Date().toLocaleTimeString("fr-FR");
-    statusEl.textContent = `${features.length} événement(s) ACLED — mis à jour ${time}`;
+    setLayerBadge(src.badgeId, { count: features.length, source: geojson.source });
+    return features.length;
   } catch (err) {
-    setupTimeline([], days);
-    statusEl.textContent = `⚠️ Conflits indisponibles — ${err.message}`;
+    setLayerBadge(src.badgeId, { error: err.message });
+    return 0;
   }
+}
+
+async function loadEvents() {
+  statusEl.textContent = "Chargement…";
+  const days = daysEl.value;
+  const params = new URLSearchParams({ days, event_type: eventTypeEl.value });
+  if (countryEl.value) params.set("country", countryEl.value);
+
+  const counts = await Promise.all(EVENT_SOURCES.map((src) => loadEventSource(src, params)));
+  setupTimeline(days);
+
+  const total = counts.reduce((a, b) => a + b, 0);
+  statusEl.textContent = `${total} événement(s) — mis à jour ${new Date().toLocaleTimeString("fr-FR")}`;
 }
 
 // Couche générique pour les points simples (nucléaire, militaire,
@@ -367,6 +446,7 @@ function loadAll() {
 
 refreshBtn.addEventListener("click", loadAll);
 daysEl.addEventListener("change", loadEvents);
+EVENT_SOURCES.forEach((src) => document.getElementById(src.toggleId).addEventListener("change", loadEvents));
 countryEl.addEventListener("change", loadEvents);
 eventTypeEl.addEventListener("change", loadEvents);
 nuclearToggleEl.addEventListener("change", loadNuclearSites);

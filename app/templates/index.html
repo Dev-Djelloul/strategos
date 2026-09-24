@@ -45,11 +45,31 @@
     </div>
 
     <div class="toolbar-group">
+      <span class="toolbar-group-label">Sources de conflits</span>
+      <div class="toolbar-row">
+        <label class="toggle" title="Données qualifiées (accès API sur validation)"><input type="checkbox" id="acled-toggle" checked /> ACLED <span class="layer-badge" id="acled-badge"></span></label>
+        <label class="toggle" title="Uppsala Conflict Data Program - référence académique (jeton requis)"><input type="checkbox" id="ucdp-toggle" checked /> UCDP <span class="layer-badge" id="ucdp-badge"></span></label>
+        <label class="toggle" title="Détection automatique dans la presse mondiale - non vérifié"><input type="checkbox" id="gdelt-toggle" checked /> GDELT (presse) <span class="layer-badge" id="gdelt-badge"></span></label>
+      </div>
+    </div>
+
+    <div class="toolbar-group">
       <span class="toolbar-group-label">Couches</span>
       <div class="toolbar-row">
         <label class="toggle"><input type="checkbox" id="nuclear-toggle" checked /> ☢️ Sites nucléaires <span class="layer-badge" id="nuclear-badge"></span></label>
         <label class="toggle"><input type="checkbox" id="military-toggle" /> 🎖️ Bases militaires <span class="layer-badge" id="military-badge"></span></label>
         <label class="toggle"><input type="checkbox" id="infrastructure-toggle" /> 🛫 Infrastructures <span class="layer-badge" id="infrastructure-badge"></span></label>
+      </div>
+    </div>
+
+    <div class="toolbar-group">
+      <span class="toolbar-group-label">Navigation 3D</span>
+      <div class="toolbar-row">
+        <div class="field">
+          <label for="region">Aller à</label>
+          <select id="region"><option value="">Choisir une région…</option></select>
+        </div>
+        <label class="toggle" title="Villes et reliefs en 3D photoréaliste (Google Photorealistic 3D Tiles via Cesium Ion), à zoom rapproché"><input type="checkbox" id="photo3d-toggle" /> Villes 3D photoréalistes</label>
       </div>
     </div>
 

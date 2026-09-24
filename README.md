@@ -11,7 +11,12 @@ data — backend FastAPI, globe CesiumJS, plusieurs couches de données.
   nécessite un compte Cesium Ion gratuit), jour/nuit en temps réel
 - **Horloge mondiale** — UTC + fuseaux stratégiques, intégrée à la barre
   d'outils
-- **Couche conflits** — [ACLED](https://acleddata.com/), données qualifiées
+- **Navigation 3D** — recherche de lieux (loupe), 11 régions pré-cadrées en
+  vue inclinée, et « Villes 3D photoréalistes » (Google Photorealistic 3D
+  Tiles via Cesium Ion, nécessite le token)
+- **Sources de conflits multiples** — ACLED, UCDP et GDELT, activables
+  séparément, superposées sur la même timeline
+- **Couche conflits (ACLED)** — [ACLED](https://acleddata.com/), données qualifiées
   sur les événements de conflit. Inscription gratuite requise ; l'accès API
   est en plus soumis à validation manuelle par ACLED (délai variable)
 - **Couche sites nucléaires** — installations civiles déclarées (centrales,
@@ -37,6 +42,18 @@ data — backend FastAPI, globe CesiumJS, plusieurs couches de données.
    équipe (indépendante de l'inscription) - en attendant, la couche
    affiche « indisponible » (aucune donnée factice)
 
+### UCDP (conflits, référence académique)
+
+Jeton gratuit à demander par email à ucdp@pcr.uu.se, puis dans `.env` :
+`UCDP_ACCESS_TOKEN=...` (version du jeu de données : `UCDP_GED_VERSION`).
+
+### GDELT (conflits, presse mondiale)
+
+Aucune configuration : fichiers publics toutes les 15 min. Données
+détectées automatiquement dans la presse, **non vérifiées** (violence
+matérielle, localisée à la ville/région, ≥ 2 sources), agrégées par lieu.
+Mises en cache dans `.cache/`.
+
 ### Cesium Ion (relief du globe, optionnel)
 
 1. Crée un compte gratuit sur https://ion.cesium.com/signup
@@ -60,6 +77,8 @@ app/
   main.py              # routes FastAPI (page + API JSON)
   services/
     acled.py           # client ACLED (OAuth + requêtes)
+    ucdp.py            # client UCDP GED (jeton requis)
+    gdelt.py           # client GDELT 2.0 (fichiers 15 min, cache disque)
     nuclear.py          # client Wikidata (sites nucléaires civils)
     overpass.py         # client générique Overpass (OpenStreetMap)
     military.py         # requête Overpass : bases militaires
