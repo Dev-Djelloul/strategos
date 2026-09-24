@@ -43,7 +43,7 @@ data — backend FastAPI, globe CesiumJS, plusieurs couches de données.
 ### ACLED (conflits)
 
 1. Crée un compte sur https://acleddata.com/user/register
-2. Copie `.env.example` en `.env` et renseigne ton email/mot de passe ACLED
+2. Renseigne ton email/mot de passe ACLED dans les secrets du Worker (`ACLED_EMAIL`, `ACLED_PASSWORD`)
 3. **Le niveau d'accès conditionne l'API** : une adresse générique (gmail…)
    reçoit le niveau *Open* (données agrégées seulement, pas d'événements
    → erreur 403). Les événements détaillés (décalés d'environ une semaine)
@@ -54,8 +54,8 @@ data — backend FastAPI, globe CesiumJS, plusieurs couches de données.
 
 ### UCDP (conflits, référence académique)
 
-Jeton gratuit à demander par email à mertcan.yilmaz@pcr.uu.se, puis dans `.env` :
-`UCDP_ACCESS_TOKEN=...` (version du jeu de données : `UCDP_GED_VERSION`).
+Jeton gratuit à demander par email à mertcan.yilmaz@pcr.uu.se, puis secret
+`UCDP_ACCESS_TOKEN` (version du jeu de données : `UCDP_GED_VERSION`).
 
 ### GDELT (conflits, presse mondiale)
 
@@ -82,34 +82,52 @@ cp .env.example .env
 
 ## Architecture
 
+Un seul projet Cloudflare (`worker/`) : un **Worker TypeScript** pour l'API et
+les pages générées, et des **assets statiques** pour le globe.
+
 ```
-app/
-  main.py              # routes FastAPI (page + API JSON)
-  services/
-    acled.py           # client ACLED (OAuth + requêtes)
-    ucdp.py            # client UCDP GED (jeton requis)
-    conflicts.py       # fusion des sources + niveau de fiabilité
-    gdelt.py           # client GDELT 2.0 (fichiers 15 min, cache disque)
-    nuclear.py          # client Wikidata (sites nucléaires civils)
-    overpass.py         # client générique Overpass (OpenStreetMap)
-    military.py         # requête Overpass : bases militaires
-    infrastructure.py   # requête Overpass : aéroports/ports/énergie
-  templates/index.html # page globe CesiumJS
-  static/app.js         # logique globe (fetch + rendu des couches)
-  static/style.css
-scripts/
-  test_acled_auth.py   # diagnostic auth ACLED (hors app, usage manuel)
+worker/
+  wrangler.jsonc        # assets, KV (CACHE), cron toutes les 15 min
+  public/               # globe CesiumJS (index.html, static/app.js, style.css)
+  src/
+    index.ts            # routeur : /api/*, /methodologie, /config.js, cron
+    conflicts.ts        # fusion ACLED + UCDP + GDELT, niveaux de fiabilité
+    cache.ts            # cache KV + repli sur la dernière donnée réelle
+    zip.ts              # lecture des archives ZIP GDELT
+    methodology.ts      # page Sources et méthodologie
+    sourcesInfo.ts      # métadonnées des sources (licences, fraîcheur…)
+    sources/            # acled, ucdp, gdelt, overpass, military,
+                        # infrastructure, nuclear
+  test/                 # tests unitaires (npm test)
 ```
 
-## Démarrage
+GDELT est collecté **en continu** par le cron (chaque fichier de 15 min est
+filtré, agrégé et stocké dans KV par jour) : l'historique commence donc à
+la mise en service, et une requête ne lit que quelques blobs.
+
+## Démarrage local
 
 ```bash
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-.venv/bin/uvicorn app.main:app --reload
+cd worker
+npm install
+# Secrets locaux (jamais committés) : ACLED_EMAIL, ACLED_PASSWORD,
+# UCDP_ACCESS_TOKEN, CESIUM_ION_TOKEN
+cp .dev.vars.example .dev.vars
+npx wrangler dev          # http://localhost:8787
+npm test                  # tests unitaires
 ```
 
-Puis ouvrir http://127.0.0.1:8000
+## Déploiement Cloudflare
+
+```bash
+cd worker
+npx wrangler kv namespace create CACHE      # copier l'id dans wrangler.jsonc
+npx wrangler secret put CESIUM_ION_TOKEN    # + ACLED_EMAIL, ACLED_PASSWORD, UCDP_ACCESS_TOKEN
+npx wrangler deploy
+```
+
+Les limites de CPU du plan Workers Free (10 ms/requête) sont serrées pour
+la collecte GDELT ; le plan Workers Paid est recommandé.
 
 ## Roadmap
 
@@ -117,5 +135,4 @@ Puis ouvrir http://127.0.0.1:8000
 - [ ] Historique long terme (au-delà de 30 jours, pas seulement l'instantané)
 - [ ] Zones de contrôle territorial (pas de source ouverte identifiée pour
   l'instant - à rechercher)
-- [ ] Déploiement (Cloudflare Pages / Workers pour le frontend, backend à
-  héberger)
+- [x] Backend et frontend sur Cloudflare (Worker + assets) — à déployer

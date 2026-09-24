@@ -1,0 +1,6 @@
+# Copier en .dev.vars (ignoré par git) pour `wrangler dev`.
+# En production : `wrangler secret put <NOM>`.
+CESIUM_ION_TOKEN=
+ACLED_EMAIL=
+ACLED_PASSWORD=
+UCDP_ACCESS_TOKEN=
