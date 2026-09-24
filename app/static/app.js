@@ -102,9 +102,12 @@ function frameBBox([w, s, e, n]) {
   const center = Cesium.Cartesian3.fromDegrees((w + e) / 2, (s + n) / 2, 0);
   const corner = Cesium.Cartesian3.fromDegrees(e, n, 0);
   const radius = Cesium.Cartesian3.distance(center, corner);
-  viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(center, radius), {
+  // Pays très étendu (ex : Russie) : vue plongeante et distance plafonnée,
+  // une vue inclinée à plusieurs milliers de km fait échouer le rendu.
+  const wide = radius > 2500000;
+  viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(center, wide ? 2500000 : radius), {
     duration: 2.5,
-    offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-50), radius * 2.4),
+    offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(wide ? -90 : -50), wide ? 12000000 : radius * 2.4),
   });
 }
 
@@ -697,7 +700,9 @@ document.getElementById("zone-view").addEventListener("click", () => {
   const rect = viewer.camera.computeViewRectangle();
   if (!rect) return setZone(null);
   const deg = Cesium.Math.toDegrees;
-  setZone([deg(rect.west), deg(rect.south), deg(rect.east), deg(rect.north)]);
+  const box = [deg(rect.west), deg(rect.south), deg(rect.east), deg(rect.north)];
+  // Vue qui embrasse toute la planète (ou un pôle) : pas de cadre utile.
+  setZone(box[2] - box[0] >= 350 || box[3] - box[1] >= 170 ? null : box);
   regionEl.value = "";
 });
 document.getElementById("zone-clear").addEventListener("click", () => {
