@@ -11,6 +11,10 @@ data — backend FastAPI, globe CesiumJS, plusieurs couches de données.
   nécessite un compte Cesium Ion gratuit), jour/nuit en temps réel
 - **Horloge mondiale** — UTC + fuseaux stratégiques, intégrée à la barre
   d'outils
+- **Bannière d'état et page `/methodologie`** — la bannière dit ce qui
+  alimente le globe et signale l'absence de source qualifiée ; la page
+  détaille sources, fraîcheur, licences, règles de fusion et limites
+  (générée depuis `services/sources_info.py`)
 - **Navigation 3D** — recherche de lieux (loupe), 11 régions pré-cadrées en
   vue inclinée, et « Villes 3D photoréalistes » (Google Photorealistic 3D
   Tiles via Cesium Ion, nécessite le token)

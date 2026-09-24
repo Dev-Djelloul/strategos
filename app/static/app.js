@@ -408,6 +408,41 @@ const CONFIDENCE_LABELS = {
 };
 let showPressOnly = true;
 
+// Bannière d'état : dit clairement, à l'ouverture, ce qui alimente le
+// globe et ce qui manque (surtout l'absence de source qualifiée).
+const SOURCE_NAMES = { acled: "ACLED", ucdp: "UCDP", gdelt: "GDELT" };
+const QUALIFIED = ["acled", "ucdp"];
+const bannerEl = document.getElementById("source-banner");
+
+function renderSourceBanner(sources, selected, fatalError) {
+  const pill = (key, ok, text, err) =>
+    `<span class="sb-pill ${ok ? "sb-ok" : "sb-ko"}" title="${escapeHtml(err || "")}">${ok ? "●" : "○"} ${SOURCE_NAMES[key]} — ${escapeHtml(text)}</span>`;
+  let pills = "";
+  let qualifiedOk = false;
+  if (fatalError) {
+    pills = `<span class="sb-pill sb-ko">○ Serveur — ${escapeHtml(fatalError)}</span>`;
+  } else {
+    pills = selected.map((s) => {
+      const st = sources?.[s.key];
+      if (st?.ok) {
+        if (QUALIFIED.includes(s.key)) qualifiedOk = true;
+        return pill(s.key, true, `${st.count} événement(s)`);
+      }
+      return pill(s.key, false, "indisponible", st?.error);
+    }).join("");
+  }
+
+  let message = "";
+  if (!fatalError && selected.length && !qualifiedOk) {
+    message = `<strong>Aucune source qualifiée disponible</strong> (ACLED, UCDP) : seuls des événements détectés dans la presse, <em>non vérifiés</em>, sont affichés.`;
+  }
+  const hasIssue = fatalError || message || (selected.length && selected.some((s) => !sources?.[s.key]?.ok));
+  bannerEl.classList.toggle("sb-warn", Boolean(message || fatalError));
+  bannerEl.innerHTML = `<div class="sb-line">${message ? `<span class="sb-msg">${message}</span>` : ""}<span class="sb-pills">${pills}</span><a href="/methodologie">Pourquoi ? Sources et méthodologie →</a></div>`;
+  bannerEl.hidden = !hasIssue;
+  syncToolbarHeight();
+}
+
 async function loadEvents() {
   statusEl.textContent = "Chargement…";
   conflictsLayer.entities.removeAll();
@@ -415,6 +450,7 @@ async function loadEvents() {
   const selected = EVENT_SOURCES.filter((s) => document.getElementById(s.toggleId).checked);
   EVENT_SOURCES.forEach((s) => setLayerBadge(s.badgeId));
   if (!selected.length) {
+    renderSourceBanner({}, selected);
     setupTimeline(days);
     statusEl.textContent = "Aucune source de conflits sélectionnée";
     return;
@@ -468,11 +504,13 @@ async function loadEvents() {
       else setLayerBadge(s.badgeId, { error: st.error });
     });
     setupTimeline(days);
+    renderSourceBanner(geojson.sources, selected);
 
     const confirmed = features.filter((f) => f.properties.confidence === "confirmed").length;
     statusEl.textContent = `${features.length} événement(s) dont ${confirmed} confirmé(s) — mis à jour ${new Date().toLocaleTimeString("fr-FR")}`;
   } catch (err) {
     setupTimeline(days);
+    renderSourceBanner(null, selected, err.message);
     statusEl.textContent = `⚠️ Conflits indisponibles — ${err.message}`;
   }
 }

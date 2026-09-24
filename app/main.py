@@ -16,6 +16,7 @@ from app.services.gdelt import fetch_gdelt_events
 from app.services.infrastructure import fetch_infrastructure_sites
 from app.services.military import fetch_military_sites
 from app.services.nuclear import fetch_nuclear_sites
+from app.services.sources_info import BASEMAP_CREDITS, CONFLICT_SOURCES, LAYER_SOURCES, configured
 from app.services.ucdp import fetch_ucdp_events
 
 load_dotenv()
@@ -55,6 +56,12 @@ async def _layer_response(source_name: str, fetch_fn):
     return result
 
 
+def _asset_version() -> int:
+    # Cache-busting : le navigateur recharge les fichiers modifiés au lieu
+    # de servir une ancienne version en cache.
+    return int(max((BASE_DIR / "static" / f).stat().st_mtime for f in ("app.js", "style.css")))
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     return templates.TemplateResponse(
@@ -63,10 +70,23 @@ async def index(request: Request):
             "request": request,
             # Optionnel : sans token, le globe reste plat (ellipsoïde) au
             # lieu d'afficher le relief. Compte gratuit sur ion.cesium.com.
-            # Cache-busting : le navigateur recharge les fichiers modifiés
-            # au lieu de servir une ancienne version en cache.
-            "asset_version": int(max((BASE_DIR / "static" / f).stat().st_mtime for f in ("app.js", "style.css"))),
+            "asset_version": _asset_version(),
             "cesium_ion_token": os.environ.get("CESIUM_ION_TOKEN", ""),
+        },
+    )
+
+
+@app.get("/methodologie", response_class=HTMLResponse)
+async def methodology(request: Request):
+    sources = [{**src, "configured": configured(src)} for src in CONFLICT_SOURCES]
+    return templates.TemplateResponse(
+        "methodology.html",
+        {
+            "request": request,
+            "asset_version": _asset_version(),
+            "sources": sources,
+            "layers": LAYER_SOURCES,
+            "credits": BASEMAP_CREDITS,
         },
     )
 
