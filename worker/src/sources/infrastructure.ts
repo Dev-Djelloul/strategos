@@ -25,9 +25,9 @@ out center 300;`,
   },
 };
 
-export async function fetchInfrastructureSites(env: Env, ctx: Ctx): Promise<FeatureCollection> {
+export async function fetchInfrastructureSites(env: Env, ctx: Ctx, waitMs?: number): Promise<FeatureCollection> {
   const parts = await Promise.all(
-    Object.entries(QUERIES).map(([name, q]) => queryOverpass(env, ctx, q.ql, `infra_${name}`, q.label)),
+    Object.entries(QUERIES).map(([name, q]) => queryOverpass(env, ctx, q.ql, `infra_${name}`, q.label, waitMs)),
   );
   const stale = parts.filter((p) => p.stale);
   const result: FeatureCollection = {

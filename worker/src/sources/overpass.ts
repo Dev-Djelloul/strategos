@@ -45,6 +45,7 @@ async function queryMirrors(queryQl: string): Promise<{ elements?: OsmElement[];
         method: "POST",
         headers: { "User-Agent": USER_AGENT },
         body: new URLSearchParams({ data: queryQl }),
+        signal: AbortSignal.timeout(70000), // une instance qui ne répond pas ne bloque pas les autres
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const payload = (await res.json()) as { elements?: OsmElement[]; remark?: string };
@@ -65,8 +66,11 @@ export function queryOverpass(
   queryQl: string,
   cacheKey: string,
   nameFallback: string,
+  waitMs?: number,
 ): Promise<FeatureCollection> {
-  return cachedFetch(env, ctx, `overpass_${cacheKey}`, CACHE_TTL_SECONDS, async () =>
-    toGeoJson((await queryMirrors(queryQl)).elements ?? [], nameFallback),
+  return cachedFetch(
+    env, ctx, `overpass_${cacheKey}`, CACHE_TTL_SECONDS,
+    async () => toGeoJson((await queryMirrors(queryQl)).elements ?? [], nameFallback),
+    waitMs,
   );
 }

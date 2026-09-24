@@ -44,5 +44,5 @@ async function fetchFromWikidata(): Promise<FeatureCollection> {
   return { type: "FeatureCollection", features };
 }
 
-export const fetchNuclearSites = (env: Env, ctx: Ctx): Promise<FeatureCollection> =>
-  cachedFetch(env, ctx, "wikidata_nuclear", CACHE_TTL_SECONDS, fetchFromWikidata, 15000);
+export const fetchNuclearSites = (env: Env, ctx: Ctx, waitMs = 15000): Promise<FeatureCollection> =>
+  cachedFetch(env, ctx, "wikidata_nuclear", CACHE_TTL_SECONDS, fetchFromWikidata, waitMs);

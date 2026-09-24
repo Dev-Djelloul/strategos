@@ -10,5 +10,5 @@ const QUERY = `[out:json][timeout:60];
 );
 out center 400;`;
 
-export const fetchMilitarySites = (env: Env, ctx: Ctx): Promise<FeatureCollection> =>
-  queryOverpass(env, ctx, QUERY, "military", "Site militaire");
+export const fetchMilitarySites = (env: Env, ctx: Ctx, waitMs?: number): Promise<FeatureCollection> =>
+  queryOverpass(env, ctx, QUERY, "military", "Site militaire", waitMs);

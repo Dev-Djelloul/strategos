@@ -92,15 +92,20 @@ export default {
     return env.ASSETS.fetch(request);
   },
 
-  /** Cron (toutes les 15 min) : collecte GDELT et préchauffage des couches lentes. */
+  /** Cron (toutes les 15 min) : collecte GDELT et préchauffage des couches
+   * lentes. Le handler ATTEND la fin des actualisations : en requête, un
+   * waitUntil est coupé ~30 s après la réponse, trop court pour Overpass. */
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    ctx.waitUntil(
-      Promise.allSettled([
-        ingestGdelt(env, 30),
-        fetchNuclearSites(env, ctx).catch(() => {}),
-        fetchMilitarySites(env, ctx).catch(() => {}),
-        fetchInfrastructureSites(env, ctx).catch(() => {}),
-      ]),
-    );
+    const WAIT = 10 * 60 * 1000;
+    const log = (name: string) => (r: PromiseSettledResult<unknown>) =>
+      console.log(`cron ${name}: ${r.status === "fulfilled" ? "ok" : "échec — " + errMessage(r.reason)}`);
+    const jobs: [string, Promise<unknown>][] = [
+      ["gdelt", ingestGdelt(env, 30)],
+      ["nucléaire", fetchNuclearSites(env, ctx, WAIT)],
+      ["militaire", fetchMilitarySites(env, ctx, WAIT)],
+      ["infrastructures", fetchInfrastructureSites(env, ctx, WAIT)],
+    ];
+    const results = await Promise.allSettled(jobs.map(([, p]) => p));
+    results.forEach((r, i) => log(jobs[i][0])(r));
   },
 } satisfies ExportedHandler<Env>;
