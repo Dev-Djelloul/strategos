@@ -2,7 +2,7 @@
 Dataset), référence académique sur la violence organisée.
 
 L'API UCDP exige un jeton d'accès gratuit (demande par email à
-ucdp@pcr.uu.se), à renseigner dans UCDP_ACCESS_TOKEN. La version du jeu
+mertcan.yilmaz@pcr.uu.se), à renseigner dans UCDP_ACCESS_TOKEN. La version du jeu
 de données se règle avec UCDP_GED_VERSION (les versions "candidate"
 publiées chaque mois sont plus récentes que la version annuelle).
 """
@@ -31,15 +31,16 @@ async def fetch_ucdp_events(event_type: str = "all", country: Optional[str] = No
     token = os.environ.get("UCDP_ACCESS_TOKEN")
     if not token:
         raise UcdpCredentialsMissing(
-            "UCDP_ACCESS_TOKEN absent : demande un jeton gratuit à ucdp@pcr.uu.se "
+            "UCDP_ACCESS_TOKEN absent : demande un jeton gratuit à mertcan.yilmaz@pcr.uu.se "
             "puis renseigne-le dans .env"
         )
-    version = os.environ.get("UCDP_GED_VERSION", "25.1")
+    version = os.environ.get("UCDP_GED_VERSION", "26.1")
     end = datetime.date.today()
     start = end - datetime.timedelta(days=days)
     params = {"pagesize": PAGE_SIZE, "StartDate": start.isoformat(), "EndDate": end.isoformat()}
-    if country in COUNTRIES:
-        params["Country"] = COUNTRIES[country]
+    # Le filtre "Country" de l'API attend un code numérique (Gleditsch-Ward) :
+    # on filtre plutôt par nom, côté client.
+    country_name = COUNTRIES.get(country) if country else None
 
     rows: list = []
     async with httpx.AsyncClient(timeout=30.0, headers={"x-ucdp-access-token": token}) as client:
@@ -56,6 +57,8 @@ async def fetch_ucdp_events(event_type: str = "all", country: Optional[str] = No
     for r in rows:
         etype = VIOLENCE_TO_TYPE.get(r.get("type_of_violence"), "offensive")
         if event_type != "all" and etype != event_type:
+            continue
+        if country_name and r.get("country") != country_name:
             continue
         try:
             lat, lon = float(r["latitude"]), float(r["longitude"])
