@@ -1,9 +1,12 @@
 :root {
   --bg: #0e1116;
   --panel: #161b22;
+  --panel-raised: #1c232c;
+  --border: #2d3541;
   --text: #e6edf3;
   --muted: #8b949e;
   --accent: #c9302c;
+  --accent-hover: #e05a56;
 }
 
 * { box-sizing: border-box; }
@@ -17,63 +20,131 @@ html, body {
 }
 
 .topbar {
-  padding: 12px 20px;
+  padding: 14px 24px;
   background: var(--panel);
-  border-bottom: 1px solid #30363d;
+  border-bottom: 1px solid var(--border);
 }
 
 .topbar h1 {
   margin: 0;
-  font-size: 1.4rem;
-  letter-spacing: 0.02em;
+  font-size: 1.3rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .subtitle {
-  margin: 4px 0 0;
+  margin: 3px 0 0;
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
 }
 
-.controls {
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 24px;
+  padding: 12px 24px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.toolbar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.toolbar-group-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.toolbar-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 20px;
-  background: var(--panel);
-  border-bottom: 1px solid #30363d;
+  flex-wrap: wrap;
 }
 
-.controls select, .controls button {
-  background: #21262d;
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.field label {
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.field select {
+  background: var(--panel-raised);
   color: var(--text);
-  border: 1px solid #30363d;
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 6px 10px;
   font-size: 0.85rem;
+  min-width: 130px;
 }
 
-.controls button {
-  cursor: pointer;
+.field select:focus, .toggle input:focus {
+  outline: 2px solid var(--accent-hover);
+  outline-offset: 1px;
+}
+
+.btn-primary {
   background: var(--accent);
-  border-color: var(--accent);
+  color: white;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  align-self: flex-end;
+  transition: background-color 0.15s ease;
 }
 
-.demo-label {
-  color: var(--muted);
-  font-size: 0.8rem;
+.btn-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.toggle {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text);
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-muted {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.toolbar-status {
+  margin-left: auto;
+  align-self: center;
 }
 
 .status {
   color: var(--muted);
   font-size: 0.8rem;
-  margin-left: auto;
+  white-space: nowrap;
 }
 
 #cesiumContainer {
-  height: calc(100vh - 108px);
+  height: calc(100vh - 126px);
   width: 100%;
 }
 
@@ -82,5 +153,16 @@ html, body {
 }
 
 .cesium-infoBox-title {
-  background: #21262d;
+  background: var(--panel-raised);
+}
+
+@media (max-width: 900px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+  .toolbar-status {
+    margin-left: 0;
+  }
 }

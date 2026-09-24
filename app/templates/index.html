@@ -9,32 +9,49 @@
 </head>
 <body>
   <header class="topbar">
-    <h1>Strategos</h1>
-    <p class="subtitle">Globe des conflits et tensions — données ACLED</p>
+    <h1>🌍 Strategos</h1>
+    <p class="subtitle">Globe des conflits et tensions géopolitiques</p>
   </header>
 
-  <div class="controls">
-    <label for="days">Période :</label>
-    <select id="days">
-      <option value="1">Dernières 24h</option>
-      <option value="7">7 derniers jours</option>
-      <option value="30">30 derniers jours</option>
-    </select>
+  <div class="toolbar">
+    <div class="toolbar-group">
+      <span class="toolbar-group-label">Filtres conflits</span>
+      <div class="toolbar-row">
+        <div class="field">
+          <label for="days">Période</label>
+          <select id="days">
+            <option value="1">Dernières 24h</option>
+            <option value="7">7 derniers jours</option>
+            <option value="30">30 derniers jours</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="country">Pays</label>
+          <select id="country">
+            <option value="">Tous</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="event-type">Type</label>
+          <select id="event-type">
+            <option value="all">Tous</option>
+          </select>
+        </div>
+        <button id="refresh" class="btn-primary">↻ Actualiser</button>
+      </div>
+    </div>
 
-    <label for="country">Pays :</label>
-    <select id="country">
-      <option value="">Tous</option>
-    </select>
+    <div class="toolbar-group">
+      <span class="toolbar-group-label">Couches</span>
+      <div class="toolbar-row">
+        <label class="toggle"><input type="checkbox" id="nuclear-toggle" checked /> ☢️ Sites nucléaires</label>
+        <label class="toggle toggle-muted"><input type="checkbox" id="demo-toggle" /> Mode démo (sans réseau)</label>
+      </div>
+    </div>
 
-    <label for="event-type">Type :</label>
-    <select id="event-type">
-      <option value="all">Tous</option>
-    </select>
-
-    <button id="refresh">Actualiser</button>
-    <label class="demo-label"><input type="checkbox" id="demo-toggle" /> Mode démo (sans réseau)</label>
-    <label class="demo-label"><input type="checkbox" id="nuclear-toggle" checked /> ☢️ Sites nucléaires</label>
-    <span id="status" class="status"></span>
+    <div class="toolbar-status">
+      <span id="status" class="status"></span>
+    </div>
   </div>
 
   <div id="cesiumContainer"></div>

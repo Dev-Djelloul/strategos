@@ -1,8 +1,16 @@
 // Pas de token Cesium Ion : on évite volontairement les services payants
 // (imagerie Bing, terrain haute-résolution) et on utilise à la place des
-// tuiles OpenStreetMap gratuites + une ellipsoïde sans relief. Le moteur
+// services Esri gratuits sans clé + une ellipsoïde sans relief. Le moteur
 // 3D de CesiumJS lui-même est open source et ne nécessite aucune clé.
 Cesium.Ion.defaultAccessToken = undefined;
+
+// Imagerie satellite (World Imagery) : rendu bien plus détaillé qu'un fond
+// de carte plat façon plan de rue, gratuit et sans clé.
+const satelliteImagery = new Cesium.UrlTemplateImageryProvider({
+  url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  credit: "Esri, Maxar, Earthstar Geographics",
+  maximumLevel: 19,
+});
 
 const viewer = new Cesium.Viewer("cesiumContainer", {
   baseLayerPicker: false,
@@ -15,11 +23,19 @@ const viewer = new Cesium.Viewer("cesiumContainer", {
   fullscreenButton: false,
   infoBox: true,
   selectionIndicator: true,
-  imageryProvider: new Cesium.OpenStreetMapImageryProvider({
-    url: "https://tile.openstreetmap.org/",
-  }),
+  imageryProvider: satelliteImagery,
   terrainProvider: new Cesium.EllipsoidTerrainProvider(),
 });
+
+// Couche de référence superposée (transparente) : frontières, noms de
+// pays, villes, routes principales - gratuite et sans clé également.
+viewer.imageryLayers.addImageryProvider(
+  new Cesium.UrlTemplateImageryProvider({
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+    credit: "Esri",
+    maximumLevel: 19,
+  })
+);
 
 viewer.scene.globe.enableLighting = true;
 viewer.camera.flyHome(0);
