@@ -143,7 +143,11 @@ async def fetch_conflict_events(
     headers = {"Authorization": f"Bearer {token}"}
     async with httpx.AsyncClient(timeout=20.0, headers=headers) as client:
         response = await client.get(ACLED_READ_URL, params=params)
-        response.raise_for_status()
+        if response.status_code >= 400:
+            # httpx.HTTPStatusError n'inclut pas le corps de la réponse -
+            # or c'est souvent là qu'ACLED explique la vraie cause (ex:
+            # conditions d'utilisation de l'API non acceptées).
+            raise RuntimeError(f"ACLED a refusé la requête ({response.status_code}): {response.text[:300]}")
         payload = response.json()
 
     if not payload.get("success", True):
