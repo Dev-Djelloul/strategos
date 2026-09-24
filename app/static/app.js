@@ -63,8 +63,12 @@ viewer.camera.flyHome(0);
 // (ex: actualiser les conflits sans effacer les sites nucléaires).
 const conflictsLayer = new Cesium.CustomDataSource("conflicts");
 const nuclearLayer = new Cesium.CustomDataSource("nuclear");
+const militaryLayer = new Cesium.CustomDataSource("military");
+const infrastructureLayer = new Cesium.CustomDataSource("infrastructure");
 viewer.dataSources.add(conflictsLayer);
 viewer.dataSources.add(nuclearLayer);
+viewer.dataSources.add(militaryLayer);
+viewer.dataSources.add(infrastructureLayer);
 
 const statusEl = document.getElementById("status");
 const daysEl = document.getElementById("days");
@@ -73,6 +77,8 @@ const eventTypeEl = document.getElementById("event-type");
 const refreshBtn = document.getElementById("refresh");
 const demoToggleEl = document.getElementById("demo-toggle");
 const nuclearToggleEl = document.getElementById("nuclear-toggle");
+const militaryToggleEl = document.getElementById("military-toggle");
+const infrastructureToggleEl = document.getElementById("infrastructure-toggle");
 
 const EVENT_TYPE_LABELS = {
   all: "Tous",
@@ -92,6 +98,8 @@ const EVENT_COLORS = {
 };
 
 const NUCLEAR_COLOR = Cesium.Color.fromCssColorString("#f4d03f");
+const MILITARY_COLOR = Cesium.Color.fromCssColorString("#5b8def");
+const INFRASTRUCTURE_COLOR = Cesium.Color.fromCssColorString("#7ed6c1");
 
 function escapeHtml(str) {
   const div = document.createElement("div");
@@ -182,48 +190,67 @@ async function loadEvents() {
   }
 }
 
-async function loadNuclearSites() {
-  nuclearLayer.entities.removeAll();
-  if (!nuclearToggleEl?.checked) return;
+// Couche générique pour les points simples (nucléaire, militaire,
+// infrastructures) : même structure GeoJSON, seul le style et
+// l'endpoint changent.
+async function loadSimpleLayer({ dataSource, toggleEl, endpoint, color, icon, emptyLabel }) {
+  dataSource.entities.removeAll();
+  if (!toggleEl?.checked) return;
 
   const demo = demoToggleEl?.checked ? "?demo=true" : "";
 
   try {
-    const res = await fetch(`/api/nuclear-sites${demo}`);
+    const res = await fetch(`${endpoint}${demo}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const geojson = await res.json();
 
-    const features = geojson.features || [];
-    features.forEach((feature) => {
+    (geojson.features || []).forEach((feature) => {
       const [lon, lat] = feature.geometry.coordinates;
       const props = feature.properties || {};
-      const name = props.name || "Site nucléaire";
+      const name = props.name || emptyLabel;
 
       const descriptionParts = [];
       if (props.country) descriptionParts.push(`<strong>Pays :</strong> ${escapeHtml(props.country)}`);
       if (props.status) descriptionParts.push(`<strong>Statut :</strong> ${escapeHtml(props.status)}`);
+      if (props.type) descriptionParts.push(`<strong>Type :</strong> ${escapeHtml(props.type)}`);
+      if (props.operator) descriptionParts.push(`<strong>Opérateur :</strong> ${escapeHtml(props.operator)}`);
 
-      nuclearLayer.entities.add({
+      dataSource.entities.add({
         position: Cesium.Cartesian3.fromDegrees(lon, lat),
         point: {
           pixelSize: 10,
-          color: NUCLEAR_COLOR,
+          color,
           outlineColor: Cesium.Color.BLACK,
           outlineWidth: 2,
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
         },
-        name: `☢️ ${name}`,
+        name: `${icon} ${name}`,
         description: descriptionParts.join("<br/>"),
       });
     });
   } catch (err) {
-    console.error("Erreur chargement sites nucléaires:", err);
+    console.error(`Erreur chargement couche ${endpoint}:`, err);
   }
 }
+
+const loadNuclearSites = () => loadSimpleLayer({
+  dataSource: nuclearLayer, toggleEl: nuclearToggleEl, endpoint: "/api/nuclear-sites",
+  color: NUCLEAR_COLOR, icon: "☢️", emptyLabel: "Site nucléaire",
+});
+const loadMilitarySites = () => loadSimpleLayer({
+  dataSource: militaryLayer, toggleEl: militaryToggleEl, endpoint: "/api/military-sites",
+  color: MILITARY_COLOR, icon: "🎖️", emptyLabel: "Site militaire",
+});
+const loadInfrastructureSites = () => loadSimpleLayer({
+  dataSource: infrastructureLayer, toggleEl: infrastructureToggleEl, endpoint: "/api/infrastructure-sites",
+  color: INFRASTRUCTURE_COLOR, icon: "🛫", emptyLabel: "Infrastructure",
+});
 
 function loadAll() {
   loadEvents();
   loadNuclearSites();
+  loadMilitarySites();
+  loadInfrastructureSites();
 }
 
 refreshBtn.addEventListener("click", loadAll);
@@ -232,6 +259,8 @@ countryEl.addEventListener("change", loadEvents);
 eventTypeEl.addEventListener("change", loadEvents);
 demoToggleEl.addEventListener("change", loadAll);
 nuclearToggleEl.addEventListener("change", loadNuclearSites);
+militaryToggleEl.addEventListener("change", loadMilitarySites);
+infrastructureToggleEl.addEventListener("change", loadInfrastructureSites);
 
 loadFilters().then(loadAll);
 
