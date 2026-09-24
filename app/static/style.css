@@ -1,0 +1,275 @@
+:root {
+  --bg: #0e1116;
+  --panel: #161b22;
+  --panel-raised: #1c232c;
+  --border: #2d3541;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --accent: #c9302c;
+  --accent-hover: #e05a56;
+  --ok: #4caf7d;
+  --warn: #e0a13c;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.subtitle {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.btn-icon {
+  background: var(--panel-raised);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: transform 0.2s ease, background-color 0.15s ease;
+}
+
+.btn-icon:hover {
+  background: var(--panel);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 24px;
+  padding: 12px 24px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  /* La hauteur max est calculée dynamiquement en JS (scrollHeight) plutôt
+     qu'une valeur fixe ici - un nombre de couches variable ferait sinon
+     couper le contenu (c'était le bug : l'horloge dépassait des 200px
+     fixés en dur). */
+  transition: max-height 0.25s ease, padding 0.25s ease, opacity 0.2s ease;
+}
+
+.toolbar.collapsed {
+  max-height: 0 !important;
+  padding-top: 0;
+  padding-bottom: 0;
+  opacity: 0;
+  border-bottom: none;
+}
+
+.toolbar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.toolbar-group-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.field label {
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.field select {
+  background: var(--panel-raised);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  min-width: 130px;
+}
+
+.field select:focus, .toggle input:focus {
+  outline: 2px solid var(--accent-hover);
+  outline-offset: 1px;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: white;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  align-self: flex-end;
+  transition: background-color 0.15s ease;
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text);
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-muted {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.layer-badge {
+  font-size: 0.68rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--border);
+  color: var(--muted);
+}
+
+.layer-badge.badge-live {
+  background: rgba(76, 175, 125, 0.18);
+  color: var(--ok);
+}
+
+.layer-badge.badge-demo {
+  background: rgba(224, 161, 60, 0.18);
+  color: var(--warn);
+}
+
+.toolbar-status {
+  margin-left: auto;
+  align-self: center;
+}
+
+.status {
+  color: var(--muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+#cesiumContainer {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  position: relative;
+}
+
+.world-clock-row {
+  align-items: center;
+  gap: 16px;
+}
+
+.world-clock-utc {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+#clock-utc-time {
+  font-size: 1.3rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+
+.world-clock-utc-label {
+  font-size: 0.68rem;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+}
+
+.world-clock-cities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.world-clock-city {
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.world-clock-city strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.cesium-infoBox {
+  background: var(--panel);
+}
+
+.cesium-infoBox-title {
+  background: var(--panel-raised);
+}
+
+@media (max-width: 900px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+    max-height: none;
+  }
+  .toolbar.collapsed {
+    max-height: 0;
+  }
+  .toolbar-status {
+    margin-left: 0;
+  }
+}

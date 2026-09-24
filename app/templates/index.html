@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Strategos — Globe des conflits</title>
+  <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Widgets/widgets.css" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>🌍 Strategos</h1>
+      <p class="subtitle">Globe des conflits et tensions géopolitiques</p>
+    </div>
+    <button id="toolbar-toggle" class="btn-icon" title="Replier/déplier la barre d'outils" aria-expanded="true">▲</button>
+  </header>
+
+  <div class="toolbar" id="toolbar">
+    <div class="toolbar-group">
+      <span class="toolbar-group-label">Filtres conflits</span>
+      <div class="toolbar-row">
+        <div class="field">
+          <label for="days">Période</label>
+          <select id="days">
+            <option value="1">Dernières 24h</option>
+            <option value="7">7 derniers jours</option>
+            <option value="30">30 derniers jours</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="country">Pays</label>
+          <select id="country">
+            <option value="">Tous</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="event-type">Type</label>
+          <select id="event-type">
+            <option value="all">Tous</option>
+          </select>
+        </div>
+        <button id="refresh" class="btn-primary">↻ Actualiser</button>
+      </div>
+    </div>
+
+    <div class="toolbar-group">
+      <span class="toolbar-group-label">Couches</span>
+      <div class="toolbar-row">
+        <label class="toggle"><input type="checkbox" id="nuclear-toggle" checked /> ☢️ Sites nucléaires <span class="layer-badge" id="nuclear-badge"></span></label>
+        <label class="toggle"><input type="checkbox" id="military-toggle" /> 🎖️ Bases militaires <span class="layer-badge" id="military-badge"></span></label>
+        <label class="toggle"><input type="checkbox" id="infrastructure-toggle" /> 🛫 Infrastructures <span class="layer-badge" id="infrastructure-badge"></span></label>
+      </div>
+    </div>
+
+    <div class="toolbar-group">
+      <span class="toolbar-group-label">Mode</span>
+      <div class="toolbar-row">
+        <label class="toggle toggle-muted" title="Force les données factices, sans appel réseau, sur toutes les couches">
+          <input type="checkbox" id="demo-toggle" /> Mode démo forcé
+        </label>
+      </div>
+    </div>
+
+    <div class="toolbar-group">
+      <span class="toolbar-group-label">Heure</span>
+      <div class="toolbar-row world-clock-row">
+        <div class="world-clock-utc">
+          <span id="clock-utc-time">--:--:--</span>
+          <span class="world-clock-utc-label">UTC</span>
+        </div>
+        <div class="world-clock-cities" id="clock-cities"></div>
+      </div>
+    </div>
+
+    <div class="toolbar-status">
+      <span id="status" class="status"></span>
+    </div>
+  </div>
+
+  <div id="cesiumContainer"></div>
+
+  <script>
+    window.CESIUM_ION_TOKEN = "{{ cesium_ion_token }}";
+  </script>
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Cesium.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
