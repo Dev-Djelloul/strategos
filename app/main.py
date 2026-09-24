@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -47,7 +48,15 @@ async def _layer_response(demo: bool, demo_data: dict, source_name: str, fetch_f
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(
+        "index.html",
+        {
+            "request": request,
+            # Optionnel : sans token, le globe reste plat (ellipsoïde) au
+            # lieu d'afficher le relief. Compte gratuit sur ion.cesium.com.
+            "cesium_ion_token": os.environ.get("CESIUM_ION_TOKEN", ""),
+        },
+    )
 
 
 @app.get("/api/filters")

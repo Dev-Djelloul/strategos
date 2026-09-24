@@ -9,11 +9,14 @@
 </head>
 <body>
   <header class="topbar">
-    <h1>🌍 Strategos</h1>
-    <p class="subtitle">Globe des conflits et tensions géopolitiques</p>
+    <div>
+      <h1>🌍 Strategos</h1>
+      <p class="subtitle">Globe des conflits et tensions géopolitiques</p>
+    </div>
+    <button id="toolbar-toggle" class="btn-icon" title="Replier/déplier la barre d'outils" aria-expanded="true">▲</button>
   </header>
 
-  <div class="toolbar">
+  <div class="toolbar" id="toolbar">
     <div class="toolbar-group">
       <span class="toolbar-group-label">Filtres conflits</span>
       <div class="toolbar-row">
@@ -44,10 +47,29 @@
     <div class="toolbar-group">
       <span class="toolbar-group-label">Couches</span>
       <div class="toolbar-row">
-        <label class="toggle"><input type="checkbox" id="nuclear-toggle" checked /> ☢️ Sites nucléaires</label>
-        <label class="toggle"><input type="checkbox" id="military-toggle" /> 🎖️ Bases militaires</label>
-        <label class="toggle"><input type="checkbox" id="infrastructure-toggle" /> 🛫 Infrastructures</label>
-        <label class="toggle toggle-muted"><input type="checkbox" id="demo-toggle" /> Mode démo (sans réseau)</label>
+        <label class="toggle"><input type="checkbox" id="nuclear-toggle" checked /> ☢️ Sites nucléaires <span class="layer-badge" id="nuclear-badge"></span></label>
+        <label class="toggle"><input type="checkbox" id="military-toggle" /> 🎖️ Bases militaires <span class="layer-badge" id="military-badge"></span></label>
+        <label class="toggle"><input type="checkbox" id="infrastructure-toggle" /> 🛫 Infrastructures <span class="layer-badge" id="infrastructure-badge"></span></label>
+      </div>
+    </div>
+
+    <div class="toolbar-group">
+      <span class="toolbar-group-label">Mode</span>
+      <div class="toolbar-row">
+        <label class="toggle toggle-muted" title="Force les données factices, sans appel réseau, sur toutes les couches">
+          <input type="checkbox" id="demo-toggle" /> Mode démo forcé
+        </label>
+      </div>
+    </div>
+
+    <div class="toolbar-group">
+      <span class="toolbar-group-label">Heure</span>
+      <div class="toolbar-row world-clock-row">
+        <div class="world-clock-utc">
+          <span id="clock-utc-time">--:--:--</span>
+          <span class="world-clock-utc-label">UTC</span>
+        </div>
+        <div class="world-clock-cities" id="clock-cities"></div>
       </div>
     </div>
 
@@ -56,16 +78,11 @@
     </div>
   </div>
 
-  <div id="cesiumContainer">
-    <div id="world-clock" class="world-clock">
-      <div class="world-clock-utc">
-        <span id="clock-utc-time">--:--:--</span>
-        <span class="world-clock-utc-label">UTC</span>
-      </div>
-      <div class="world-clock-cities" id="clock-cities"></div>
-    </div>
-  </div>
+  <div id="cesiumContainer"></div>
 
+  <script>
+    window.CESIUM_ION_TOKEN = "{{ cesium_ion_token }}";
+  </script>
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Cesium.js"></script>
   <script src="/static/app.js"></script>
 </body>

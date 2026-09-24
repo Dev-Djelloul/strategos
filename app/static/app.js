@@ -1,16 +1,24 @@
-// Pas de token Cesium Ion : on évite volontairement les services payants
-// (imagerie Bing, terrain haute-résolution) et on utilise à la place des
-// services Esri gratuits sans clé + une ellipsoïde sans relief. Le moteur
-// 3D de CesiumJS lui-même est open source et ne nécessite aucune clé.
-Cesium.Ion.defaultAccessToken = undefined;
+// Tout le script est enveloppé dans une IIFE async : le chargement du
+// terrain (Cesium.CesiumTerrainProvider.fromIonAssetId) est asynchrone,
+// et top-level await n'est pas disponible dans un <script> classique.
+(async () => {
 
-// Imagerie satellite (World Imagery) : rendu bien plus détaillé qu'un fond
-// de carte plat façon plan de rue, gratuit et sans clé.
+// Terrain : sans token Cesium Ion, le globe reste plat (ellipsoïde). Avec
+// un token (gratuit, ion.cesium.com), on charge le vrai relief mondial
+// (Cesium World Terrain). L'imagerie (satellite Esri + calques) reste
+// systématiquement gratuite et sans clé, quel que soit le cas.
+const ionToken = window.CESIUM_ION_TOKEN || "";
+Cesium.Ion.defaultAccessToken = ionToken || undefined;
+
 const satelliteImagery = new Cesium.UrlTemplateImageryProvider({
   url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
   credit: "Esri, Maxar, Earthstar Geographics",
   maximumLevel: 19,
 });
+
+const terrainProvider = ionToken
+  ? await Cesium.CesiumTerrainProvider.fromIonAssetId(1) // 1 = Cesium World Terrain
+  : new Cesium.EllipsoidTerrainProvider();
 
 const viewer = new Cesium.Viewer("cesiumContainer", {
   baseLayerPicker: false,
@@ -24,7 +32,7 @@ const viewer = new Cesium.Viewer("cesiumContainer", {
   infoBox: true,
   selectionIndicator: true,
   imageryProvider: satelliteImagery,
-  terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+  terrainProvider,
 });
 
 // Couche de référence superposée : frontières, noms de pays, villes -
@@ -48,6 +56,9 @@ viewer.imageryLayers.addImageryProvider(
 );
 
 viewer.scene.globe.enableLighting = true;
+if (ionToken) {
+  viewer.scene.globe.depthTestAgainstTerrain = true;
+}
 
 // Horloge synchronisée sur l'heure système réelle, qui avance en continu
 // (au lieu de rester figée sur l'instant du chargement de la page) : le
@@ -57,6 +68,11 @@ viewer.clock.clockStep = Cesium.ClockStep.SYSTEM_CLOCK;
 viewer.clock.multiplier = 1;
 
 viewer.camera.flyHome(0);
+
+// La barre d'outils se replie/déplie avec une transition CSS ; Cesium ne
+// redétecte pas automatiquement le changement de taille de son conteneur
+// dans ce cas (pas d'événement resize navigateur), d'où cet observer.
+new ResizeObserver(() => viewer.resize()).observe(document.getElementById("cesiumContainer"));
 
 // Chaque couche de données vit dans son propre DataSource : on peut la
 // rafraîchir, la vider ou l'afficher/masquer indépendamment des autres
@@ -79,6 +95,8 @@ const demoToggleEl = document.getElementById("demo-toggle");
 const nuclearToggleEl = document.getElementById("nuclear-toggle");
 const militaryToggleEl = document.getElementById("military-toggle");
 const infrastructureToggleEl = document.getElementById("infrastructure-toggle");
+const toolbarEl = document.getElementById("toolbar");
+const toolbarToggleBtn = document.getElementById("toolbar-toggle");
 
 const EVENT_TYPE_LABELS = {
   all: "Tous",
@@ -105,6 +123,32 @@ function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str ?? "";
   return div.innerHTML;
+}
+
+// Affiche, à côté de chaque case à cocher de couche, si les données
+// viennent réellement de la source live, du mode démo forcé, ou d'un
+// repli automatique suite à une erreur (avec le détail au survol) - pour
+// que "case cochée ou non" ait toujours un résultat visible et expliqué.
+function setLayerBadge(badgeId, source, fallbackReason) {
+  const el = document.getElementById(badgeId);
+  if (!el) return;
+  el.classList.remove("badge-live", "badge-demo");
+  if (source === "demo") {
+    el.textContent = "démo";
+    el.title = "Mode démo forcé";
+    el.classList.add("badge-demo");
+  } else if (source === "demo_fallback") {
+    el.textContent = "démo (repli)";
+    el.title = fallbackReason || "Source indisponible, repli automatique";
+    el.classList.add("badge-demo");
+  } else if (source) {
+    el.textContent = "live";
+    el.title = `Source : ${source}`;
+    el.classList.add("badge-live");
+  } else {
+    el.textContent = "";
+    el.title = "";
+  }
 }
 
 async function loadFilters() {
@@ -193,9 +237,12 @@ async function loadEvents() {
 // Couche générique pour les points simples (nucléaire, militaire,
 // infrastructures) : même structure GeoJSON, seul le style et
 // l'endpoint changent.
-async function loadSimpleLayer({ dataSource, toggleEl, endpoint, color, icon, emptyLabel }) {
+async function loadSimpleLayer({ dataSource, toggleEl, endpoint, color, icon, emptyLabel, badgeId }) {
   dataSource.entities.removeAll();
-  if (!toggleEl?.checked) return;
+  if (!toggleEl?.checked) {
+    setLayerBadge(badgeId, null);
+    return;
+  }
 
   const demo = demoToggleEl?.checked ? "?demo=true" : "";
 
@@ -228,22 +275,25 @@ async function loadSimpleLayer({ dataSource, toggleEl, endpoint, color, icon, em
         description: descriptionParts.join("<br/>"),
       });
     });
+
+    setLayerBadge(badgeId, geojson.source, geojson.fallback_reason);
   } catch (err) {
     console.error(`Erreur chargement couche ${endpoint}:`, err);
+    setLayerBadge(badgeId, "demo_fallback", err.message);
   }
 }
 
 const loadNuclearSites = () => loadSimpleLayer({
   dataSource: nuclearLayer, toggleEl: nuclearToggleEl, endpoint: "/api/nuclear-sites",
-  color: NUCLEAR_COLOR, icon: "☢️", emptyLabel: "Site nucléaire",
+  color: NUCLEAR_COLOR, icon: "☢️", emptyLabel: "Site nucléaire", badgeId: "nuclear-badge",
 });
 const loadMilitarySites = () => loadSimpleLayer({
   dataSource: militaryLayer, toggleEl: militaryToggleEl, endpoint: "/api/military-sites",
-  color: MILITARY_COLOR, icon: "🎖️", emptyLabel: "Site militaire",
+  color: MILITARY_COLOR, icon: "🎖️", emptyLabel: "Site militaire", badgeId: "military-badge",
 });
 const loadInfrastructureSites = () => loadSimpleLayer({
   dataSource: infrastructureLayer, toggleEl: infrastructureToggleEl, endpoint: "/api/infrastructure-sites",
-  color: INFRASTRUCTURE_COLOR, icon: "🛫", emptyLabel: "Infrastructure",
+  color: INFRASTRUCTURE_COLOR, icon: "🛫", emptyLabel: "Infrastructure", badgeId: "infrastructure-badge",
 });
 
 function loadAll() {
@@ -262,11 +312,17 @@ nuclearToggleEl.addEventListener("change", loadNuclearSites);
 militaryToggleEl.addEventListener("change", loadMilitarySites);
 infrastructureToggleEl.addEventListener("change", loadInfrastructureSites);
 
+toolbarToggleBtn.addEventListener("click", () => {
+  const collapsed = toolbarEl.classList.toggle("collapsed");
+  toolbarToggleBtn.textContent = collapsed ? "▼" : "▲";
+  toolbarToggleBtn.setAttribute("aria-expanded", String(!collapsed));
+});
+
 loadFilters().then(loadAll);
 
-// Horloge mondiale (HUD) : UTC + quelques fuseaux stratégiques, mise à
-// jour chaque seconde via l'API Intl native du navigateur (aucune
-// dépendance ni service externe).
+// Horloge mondiale : UTC + quelques fuseaux stratégiques, intégrée dans
+// la barre d'outils, mise à jour chaque seconde via l'API Intl native du
+// navigateur (aucune dépendance ni service externe).
 const WORLD_CLOCK_CITIES = [
   { label: "Washington", tz: "America/New_York" },
   { label: "Londres", tz: "Europe/London" },
@@ -300,3 +356,5 @@ function updateWorldClock() {
 
 updateWorldClock();
 setInterval(updateWorldClock, 1000);
+
+})();

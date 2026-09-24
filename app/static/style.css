@@ -7,6 +7,8 @@
   --muted: #8b949e;
   --accent: #c9302c;
   --accent-hover: #e05a56;
+  --ok: #4caf7d;
+  --warn: #e0a13c;
 }
 
 * { box-sizing: border-box; }
@@ -19,8 +21,16 @@ html, body {
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
+body {
+  display: flex;
+  flex-direction: column;
+}
+
 .topbar {
-  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
 }
@@ -38,6 +48,22 @@ html, body {
   font-size: 0.82rem;
 }
 
+.btn-icon {
+  background: var(--panel-raised);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: transform 0.2s ease, background-color 0.15s ease;
+}
+
+.btn-icon:hover {
+  background: var(--panel);
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -46,6 +72,17 @@ html, body {
   padding: 12px 24px;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  max-height: 200px;
+  transition: max-height 0.25s ease, padding 0.25s ease, opacity 0.2s ease;
+}
+
+.toolbar.collapsed {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  opacity: 0;
+  border-bottom: none;
 }
 
 .toolbar-group {
@@ -132,6 +169,24 @@ html, body {
   font-size: 0.8rem;
 }
 
+.layer-badge {
+  font-size: 0.68rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--border);
+  color: var(--muted);
+}
+
+.layer-badge.badge-live {
+  background: rgba(76, 175, 125, 0.18);
+  color: var(--ok);
+}
+
+.layer-badge.badge-demo {
+  background: rgba(224, 161, 60, 0.18);
+  color: var(--warn);
+}
+
 .toolbar-status {
   margin-left: auto;
   align-self: center;
@@ -144,51 +199,42 @@ html, body {
 }
 
 #cesiumContainer {
-  height: calc(100vh - 126px);
+  flex: 1;
   width: 100%;
+  min-height: 0;
   position: relative;
 }
 
-.world-clock {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  z-index: 10;
-  background: rgba(22, 27, 34, 0.82);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 14px;
-  backdrop-filter: blur(4px);
-  font-variant-numeric: tabular-nums;
-  pointer-events: none;
+.world-clock-row {
+  align-items: center;
+  gap: 16px;
 }
 
 .world-clock-utc {
   display: flex;
   align-items: baseline;
   gap: 6px;
+  font-variant-numeric: tabular-nums;
 }
 
 #clock-utc-time {
-  font-size: 1.5rem;
+  font-size: 1.3rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--text);
 }
 
 .world-clock-utc-label {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   color: var(--muted);
   letter-spacing: 0.05em;
 }
 
 .world-clock-cities {
-  margin-top: 6px;
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 14px;
-  border-top: 1px solid var(--border);
-  padding-top: 6px;
+  gap: 4px 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 .world-clock-city {
@@ -215,6 +261,10 @@ html, body {
     flex-direction: column;
     align-items: stretch;
     gap: 14px;
+    max-height: none;
+  }
+  .toolbar.collapsed {
+    max-height: 0;
   }
   .toolbar-status {
     margin-left: 0;
