@@ -147,7 +147,12 @@ async def fetch_conflict_events(
             # httpx.HTTPStatusError n'inclut pas le corps de la réponse -
             # or c'est souvent là qu'ACLED explique la vraie cause (ex:
             # conditions d'utilisation de l'API non acceptées).
-            raise RuntimeError(f"ACLED a refusé la requête ({response.status_code}): {response.text[:300]}")
+            hint = (
+                " — accès aux événements non accordé : les adresses génériques (gmail…) n'ont que le "
+                "niveau Open (données agrégées). Voir README, section ACLED."
+                if response.status_code == 403 else ""
+            )
+            raise RuntimeError(f"ACLED a refusé la requête ({response.status_code}): {response.text[:200]}{hint}")
         payload = response.json()
 
     if not payload.get("success", True):

@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.services.acled import COUNTRIES, EVENT_TYPE_MAP, fetch_conflict_events
+from app.services.conflicts import PRIORITY, fetch_conflicts
 from app.services.gdelt import fetch_gdelt_events
 from app.services.infrastructure import fetch_infrastructure_sites
 from app.services.military import fetch_military_sites
@@ -83,6 +84,19 @@ async def get_events(
     country: Optional[str] = Query(default=None),
 ):
     return await _layer_response("acled", lambda: fetch_conflict_events(event_type=event_type, country=country, days=days))
+
+
+@app.get("/api/conflicts")
+async def get_conflicts(
+    days: int = Query(default=1, ge=1, le=90),
+    event_type: str = Query(default="all"),
+    country: Optional[str] = Query(default=None),
+    sources: str = Query(default=",".join(PRIORITY), description="Sources à fusionner, séparées par des virgules"),
+):
+    """Événements de conflit fusionnés (ACLED + UCDP + GDELT) avec niveau de
+    fiabilité ; l'état de chaque source est renvoyé dans `sources`."""
+    wanted = [s for s in sources.split(",") if s in PRIORITY]
+    return await fetch_conflicts(wanted, event_type, country, days)
 
 
 @app.get("/api/ucdp-events")

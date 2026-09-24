@@ -14,8 +14,10 @@ data — backend FastAPI, globe CesiumJS, plusieurs couches de données.
 - **Navigation 3D** — recherche de lieux (loupe), 11 régions pré-cadrées en
   vue inclinée, et « Villes 3D photoréalistes » (Google Photorealistic 3D
   Tiles via Cesium Ion, nécessite le token)
-- **Sources de conflits multiples** — ACLED, UCDP et GDELT, activables
-  séparément, superposées sur la même timeline
+- **Sources de conflits fusionnées** — ACLED, UCDP et GDELT sont regroupés
+  (< 30 km, < 3 jours) en un seul marqueur avec un niveau de fiabilité :
+  *confirmé* (≥ 2 sources dont une qualifiée), *qualifié*, ou *presse seule*
+  (non vérifié, plus discret). Chaque source échoue indépendamment
 - **Couche conflits (ACLED)** — [ACLED](https://acleddata.com/), données qualifiées
   sur les événements de conflit. Inscription gratuite requise ; l'accès API
   est en plus soumis à validation manuelle par ACLED (délai variable)
@@ -36,11 +38,15 @@ data — backend FastAPI, globe CesiumJS, plusieurs couches de données.
 
 ### ACLED (conflits)
 
-1. Crée un compte gratuit sur https://acleddata.com/myacled
+1. Crée un compte sur https://acleddata.com/user/register
 2. Copie `.env.example` en `.env` et renseigne ton email/mot de passe ACLED
-3. L'accès à l'API ACLED nécessite en plus une validation manuelle par leur
-   équipe (indépendante de l'inscription) - en attendant, la couche
-   affiche « indisponible » (aucune donnée factice)
+3. **Le niveau d'accès conditionne l'API** : une adresse générique (gmail…)
+   reçoit le niveau *Open* (données agrégées seulement, pas d'événements
+   → erreur 403). Les événements détaillés (décalés d'environ une semaine)
+   nécessitent le niveau *Research* ou supérieur, attribué selon le domaine
+   email de l'organisation, ou sur demande à access@acleddata.com
+   (licences : licensing@acleddata.com). Tant que l'accès n'est pas
+   accordé, la couche indique « indisponible ».
 
 ### UCDP (conflits, référence académique)
 
@@ -78,6 +84,7 @@ app/
   services/
     acled.py           # client ACLED (OAuth + requêtes)
     ucdp.py            # client UCDP GED (jeton requis)
+    conflicts.py       # fusion des sources + niveau de fiabilité
     gdelt.py           # client GDELT 2.0 (fichiers 15 min, cache disque)
     nuclear.py          # client Wikidata (sites nucléaires civils)
     overpass.py         # client générique Overpass (OpenStreetMap)

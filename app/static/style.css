@@ -418,3 +418,24 @@ body {
   }
   .side-panel.open { transform: translateY(0); }
 }
+
+.sp-h3 {
+  margin: 18px 0 8px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.sp-sources {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  font-size: 0.82rem;
+}
+
+.sp-sources a { color: #5b8def; }
+.sp-src-detail { color: var(--muted); }
+.sp-src-notes { margin-top: 3px; color: var(--muted); }

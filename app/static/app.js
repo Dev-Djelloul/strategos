@@ -145,17 +145,19 @@ new ResizeObserver(() => viewer.resize()).observe(document.getElementById("cesiu
 // Chaque couche de données vit dans son propre DataSource : on peut la
 // rafraîchir, la vider ou l'afficher/masquer indépendamment des autres
 // (ex: actualiser les conflits sans effacer les sites nucléaires).
-// Une couche par source de conflits : ACLED (données qualifiées), UCDP
-// (référence académique) et GDELT (presse mondiale, non vérifié).
+// Les trois sources de conflits (ACLED qualifiée, UCDP académique, GDELT
+// presse non vérifiée) sont fusionnées côté serveur : un événement rapporté
+// par plusieurs sources devient un seul marqueur avec un niveau de fiabilité.
 const EVENT_SOURCES = [
-  { key: "acled", label: "ACLED", endpoint: "/api/events", toggleId: "acled-toggle", badgeId: "acled-badge", reliability: "verified", layer: new Cesium.CustomDataSource("acled") },
-  { key: "ucdp", label: "UCDP", endpoint: "/api/ucdp-events", toggleId: "ucdp-toggle", badgeId: "ucdp-badge", reliability: "verified", layer: new Cesium.CustomDataSource("ucdp") },
-  { key: "gdelt", label: "GDELT", endpoint: "/api/gdelt-events", toggleId: "gdelt-toggle", badgeId: "gdelt-badge", reliability: "press", layer: new Cesium.CustomDataSource("gdelt") },
+  { key: "acled", toggleId: "acled-toggle", badgeId: "acled-badge" },
+  { key: "ucdp", toggleId: "ucdp-toggle", badgeId: "ucdp-badge" },
+  { key: "gdelt", toggleId: "gdelt-toggle", badgeId: "gdelt-badge" },
 ];
+const conflictsLayer = new Cesium.CustomDataSource("conflicts");
 const nuclearLayer = new Cesium.CustomDataSource("nuclear");
 const militaryLayer = new Cesium.CustomDataSource("military");
 const infrastructureLayer = new Cesium.CustomDataSource("infrastructure");
-EVENT_SOURCES.forEach((src) => viewer.dataSources.add(src.layer));
+viewer.dataSources.add(conflictsLayer);
 viewer.dataSources.add(nuclearLayer);
 viewer.dataSources.add(militaryLayer);
 viewer.dataSources.add(infrastructureLayer);
@@ -243,7 +245,7 @@ const sidePanelEl = document.getElementById("side-panel");
 const sidePanelBody = document.getElementById("side-panel-body");
 
 function showSidePanel(info) {
-  const rel = RELIABILITY[info.reliability] || RELIABILITY.community;
+  const rel = info.badge || RELIABILITY[info.reliability] || RELIABILITY.community;
   const rows = (info.rows || [])
     .filter(([, v]) => v !== undefined && v !== null && v !== "")
     .map(([k, v]) => `<div class="sp-row"><dt>${escapeHtml(k)}</dt><dd>${escapeHtml(String(v))}</dd></div>`)
@@ -251,11 +253,18 @@ function showSidePanel(info) {
   const link = /^https?:\/\//.test(info.url || "")
     ? `<a class="sp-link" href="${escapeHtml(info.url)}" target="_blank" rel="noopener noreferrer">Ouvrir la source ↗</a>`
     : "";
+  const sources = (info.sources || []).map((x) => {
+    const r = RELIABILITY[x.reliability] || RELIABILITY.community;
+    const href = /^https?:\/\//.test(x.url || "") ? ` <a href="${escapeHtml(x.url)}" target="_blank" rel="noopener noreferrer">article ↗</a>` : "";
+    const detail = [x.date, x.count ? `${x.count} mentions` : null].filter(Boolean).join(" · ");
+    return `<li><span class="sp-rel ${r.cls}">${escapeHtml(x.label)}</span> <span class="sp-src-detail">${escapeHtml(detail)}</span>${href}${x.notes && x.reliability === "verified" ? `<div class="sp-src-notes">${escapeHtml(x.notes)}</div>` : ""}</li>`;
+  }).join("");
   sidePanelBody.innerHTML = `
     <div class="sp-kind">${escapeHtml(info.kind || "")}</div>
     <h2 class="sp-title">${escapeHtml(info.title || "Sans nom")}</h2>
     <div class="sp-source"><span class="sp-rel ${rel.cls}">${rel.label}</span> <span>${escapeHtml(info.sourceLabel || "")}</span></div>
     <dl class="sp-rows">${rows}</dl>
+    ${sources ? `<h3 class="sp-h3">Sources (${info.sources.length})</h3><ul class="sp-sources">${sources}</ul>` : ""}
     ${info.notes ? `<p class="sp-notes">${escapeHtml(info.notes)}</p>` : ""}
     ${link}
     <button class="btn-primary sp-zoom" id="sp-zoom">Zoomer sur le lieu</button>`;
@@ -340,15 +349,16 @@ function applyTimeline() {
   if (!timelineStart) return;
   const cutoff = timelineCutoff();
   timelineLabel.textContent = `jusqu'au ${cutoff}`;
-  EVENT_SOURCES.forEach(({ layer }) => layer.entities.values.forEach((entity) => {
+  conflictsLayer.entities.values.forEach((entity) => {
     const date = entity.properties?.event_date?.getValue();
-    entity.show = !date || date <= cutoff;
-  }));
+    const conf = entity.properties?.confidence?.getValue();
+    entity.show = (!date || date <= cutoff) && (showPressOnly || conf !== "press");
+  });
 }
 
 function setupTimeline(days) {
   stopTimelinePlayback();
-  const hasDated = EVENT_SOURCES.some(({ layer }) => layer.entities.values.some((e) => e.properties?.event_date?.getValue()));
+  const hasDated = conflictsLayer.entities.values.some((e) => e.properties?.event_date?.getValue());
   if (!hasDated) {
     timelineStart = null;
     timelineEl.hidden = true;
@@ -379,69 +389,85 @@ timelinePlayBtn.addEventListener("click", () => {
   }, 400);
 });
 
-async function loadEventSource(src, params) {
-  src.layer.entities.removeAll();
-  const toggle = document.getElementById(src.toggleId);
-  if (!toggle?.checked) {
-    setLayerBadge(src.badgeId);
-    return 0;
+const CONFIDENCE_STYLE = {
+  confirmed: { pixelSize: 13, alpha: 1, outline: Cesium.Color.fromCssColorString("#4caf7d"), outlineWidth: 3 },
+  verified: { pixelSize: 10, alpha: 1, outline: Cesium.Color.WHITE, outlineWidth: 1 },
+  press: { pixelSize: 7, alpha: 0.55, outline: Cesium.Color.WHITE, outlineWidth: 0 },
+};
+const CONFIDENCE_LABELS = {
+  confirmed: { label: "Confirmé — plusieurs sources dont une qualifiée", cls: "rel-verified" },
+  verified: { label: "Source qualifiée", cls: "rel-verified" },
+  press: { label: "Presse — non vérifié", cls: "rel-press" },
+};
+let showPressOnly = true;
+
+async function loadEvents() {
+  statusEl.textContent = "Chargement…";
+  conflictsLayer.entities.removeAll();
+  const days = daysEl.value;
+  const selected = EVENT_SOURCES.filter((s) => document.getElementById(s.toggleId).checked);
+  EVENT_SOURCES.forEach((s) => setLayerBadge(s.badgeId));
+  if (!selected.length) {
+    setupTimeline(days);
+    statusEl.textContent = "Aucune source de conflits sélectionnée";
+    return;
   }
 
+  const params = new URLSearchParams({ days, event_type: eventTypeEl.value, sources: selected.map((s) => s.key).join(",") });
+  if (countryEl.value) params.set("country", countryEl.value);
+
   try {
-    const geojson = await apiJson(`${src.endpoint}?${params.toString()}`);
+    const geojson = await apiJson(`/api/conflicts?${params.toString()}`);
     const features = geojson.features || [];
+
     features.forEach((feature) => {
       const [lon, lat] = feature.geometry.coordinates;
       const props = feature.properties || {};
-      const color = EVENT_COLORS[props.event_type] || Cesium.Color.fromCssColorString("#e05a56");
+      const style = CONFIDENCE_STYLE[props.confidence] || CONFIDENCE_STYLE.verified;
+      const color = (EVENT_COLORS[props.event_type] || Cesium.Color.fromCssColorString("#e05a56")).withAlpha(style.alpha);
 
-      const entity = src.layer.entities.add({
+      const entity = conflictsLayer.entities.add({
         position: Cesium.Cartesian3.fromDegrees(lon, lat),
         point: {
-          pixelSize: 9,
+          pixelSize: style.pixelSize,
           color,
-          outlineColor: Cesium.Color.WHITE,
-          outlineWidth: 1,
+          outlineColor: style.outline,
+          outlineWidth: style.outlineWidth,
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
         },
         name: props.name || "Événement",
-        properties: { event_date: props.event_date || null },
+        properties: { event_date: props.event_date || null, confidence: props.confidence },
       });
+      const conf = CONFIDENCE_LABELS[props.confidence] || CONFIDENCE_LABELS.press;
       panelInfo.set(entity, {
         kind: EVENT_TYPE_LABELS[props.event_type] || props.event_type || "Événement",
         title: props.name || "Événement",
-        sourceLabel: src.label,
-        reliability: src.reliability,
+        badge: conf,
+        sourceLabel: (props.sources || []).map((x) => x.label).filter((v, i, a) => a.indexOf(v) === i).join(" + "),
         rows: [
           ["Date", props.event_date],
           ["Victimes", props.fatalities],
-          ["Mentions presse", props.count],
         ],
-        notes: props.notes,
-        url: props.source_url,
+        sources: props.sources,
         lon,
         lat,
       });
     });
-    setLayerBadge(src.badgeId, { count: features.length, source: geojson.source, fetchedAt: geojson.fetched_at, stale: geojson.stale, staleReason: geojson.stale_reason });
-    return features.length;
+
+    EVENT_SOURCES.forEach((s) => {
+      const st = geojson.sources?.[s.key];
+      if (!st) return;
+      if (st.ok) setLayerBadge(s.badgeId, { count: st.count, source: s.key });
+      else setLayerBadge(s.badgeId, { error: st.error });
+    });
+    setupTimeline(days);
+
+    const confirmed = features.filter((f) => f.properties.confidence === "confirmed").length;
+    statusEl.textContent = `${features.length} événement(s) dont ${confirmed} confirmé(s) — mis à jour ${new Date().toLocaleTimeString("fr-FR")}`;
   } catch (err) {
-    setLayerBadge(src.badgeId, { error: err.message });
-    return 0;
+    setupTimeline(days);
+    statusEl.textContent = `⚠️ Conflits indisponibles — ${err.message}`;
   }
-}
-
-async function loadEvents() {
-  statusEl.textContent = "Chargement…";
-  const days = daysEl.value;
-  const params = new URLSearchParams({ days, event_type: eventTypeEl.value });
-  if (countryEl.value) params.set("country", countryEl.value);
-
-  const counts = await Promise.all(EVENT_SOURCES.map((src) => loadEventSource(src, params)));
-  setupTimeline(days);
-
-  const total = counts.reduce((a, b) => a + b, 0);
-  statusEl.textContent = `${total} événement(s) — mis à jour ${new Date().toLocaleTimeString("fr-FR")}`;
 }
 
 // Couche générique pour les points simples (nucléaire, militaire,
@@ -526,6 +552,10 @@ function loadAll() {
 refreshBtn.addEventListener("click", loadAll);
 daysEl.addEventListener("change", loadEvents);
 EVENT_SOURCES.forEach((src) => document.getElementById(src.toggleId).addEventListener("change", loadEvents));
+document.getElementById("press-toggle").addEventListener("change", (e) => {
+  showPressOnly = e.target.checked;
+  applyTimeline();
+});
 countryEl.addEventListener("change", loadEvents);
 eventTypeEl.addEventListener("change", loadEvents);
 nuclearToggleEl.addEventListener("change", loadNuclearSites);
