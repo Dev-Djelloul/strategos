@@ -35,7 +35,7 @@ data — backend FastAPI, globe CesiumJS, plusieurs couches de données.
 2. Copie `.env.example` en `.env` et renseigne ton email/mot de passe ACLED
 3. L'accès à l'API ACLED nécessite en plus une validation manuelle par leur
    équipe (indépendante de l'inscription) - en attendant, la couche
-   fonctionne en mode démo/fallback
+   affiche « indisponible » (aucune donnée factice)
 
 ### Cesium Ion (relief du globe, optionnel)
 
