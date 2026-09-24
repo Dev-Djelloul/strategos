@@ -27,7 +27,7 @@ SELECT ?itemLabel ?coord ?countryLabel ?statusLabel WHERE {
 
 REQUEST_HEADERS = {
     "Accept": "application/sparql-results+json",
-    "User-Agent": "Strategos/0.1 (projet pédagogique; contact: digitalblueskye@gmail.com)",
+    "User-Agent": "Strategos/0.1 (projet pedagogique; contact: digitalblueskye@gmail.com)",
 }
 
 _cache: dict = {"data": None, "expires_at": 0}

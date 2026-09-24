@@ -22,13 +22,10 @@ data — backend FastAPI, globe CesiumJS, plusieurs couches de données.
   OpenStreetMap/Overpass)
 - **Couche infrastructures** — aéroports internationaux, ports, énergie hors
   nucléaire (source: OpenStreetMap/Overpass)
-- **Mode démo forcé** — bascule toutes les couches sur des données factices,
-  sans appel réseau
-- **Fallback automatique** — si une source échoue (identifiants absents,
-  service en panne), chaque couche bascule silencieusement sur ses données
-  démo plutôt que de casser l'app ; un badge à côté de chaque case à cocher
-  indique toujours si la couche affichée est **live** ou **démo** (forcé ou
-  suite à un repli), avec le détail au survol
+- **Données réelles uniquement** — aucune donnée factice : si une source est
+  indisponible, la couche l'indique (badge « indisponible » + cause au
+  survol) au lieu d'afficher de fausses données. Chaque couche affiche le
+  nombre d'éléments réels et l'heure de mise à jour
 
 ## Configurer les sources de données
 
@@ -63,14 +60,10 @@ app/
   main.py              # routes FastAPI (page + API JSON)
   services/
     acled.py           # client ACLED (OAuth + requêtes)
-    demo_data.py        # données factices conflits (mode démo / fallback)
     nuclear.py          # client Wikidata (sites nucléaires civils)
-    nuclear_demo_data.py # données factices nucléaire (fallback)
     overpass.py         # client générique Overpass (OpenStreetMap)
     military.py         # requête Overpass : bases militaires
-    military_demo_data.py
     infrastructure.py   # requête Overpass : aéroports/ports/énergie
-    infrastructure_demo_data.py
   templates/index.html # page globe CesiumJS
   static/app.js         # logique globe (fetch + rendu des couches)
   static/style.css
@@ -90,7 +83,8 @@ Puis ouvrir http://127.0.0.1:8000
 
 ## Roadmap
 
-- [ ] Historique / timeline des événements (pas seulement l'instantané)
+- [x] Timeline des événements (curseur + lecture sur la période choisie)
+- [ ] Historique long terme (au-delà de 30 jours, pas seulement l'instantané)
 - [ ] Zones de contrôle territorial (pas de source ouverte identifiée pour
   l'instant - à rechercher)
 - [ ] Déploiement (Cloudflare Pages / Workers pour le frontend, backend à

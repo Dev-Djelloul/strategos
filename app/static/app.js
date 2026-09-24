@@ -17,7 +17,7 @@ const satelliteImagery = new Cesium.UrlTemplateImageryProvider({
 });
 
 const terrainProvider = ionToken
-  ? await Cesium.CesiumTerrainProvider.fromIonAssetId(1) // 1 = Cesium World Terrain
+  ? await Cesium.CesiumTerrainProvider.fromIonAssetId(1, { requestVertexNormals: true }) // 1 = Cesium World Terrain
   : new Cesium.EllipsoidTerrainProvider();
 
 const viewer = new Cesium.Viewer("cesiumContainer", {
@@ -31,7 +31,7 @@ const viewer = new Cesium.Viewer("cesiumContainer", {
   fullscreenButton: false,
   infoBox: true,
   selectionIndicator: true,
-  imageryProvider: satelliteImagery,
+  baseLayer: new Cesium.ImageryLayer(satelliteImagery),
   terrainProvider,
 });
 
@@ -58,6 +58,9 @@ viewer.imageryLayers.addImageryProvider(
 viewer.scene.globe.enableLighting = true;
 if (ionToken) {
   viewer.scene.globe.depthTestAgainstTerrain = true;
+  // Le relief réel est quasi invisible à l'échelle du globe : on
+  // l'accentue légèrement pour qu'il se voie sans être déformé.
+  viewer.scene.verticalExaggeration = 1.5;
 }
 
 // Horloge synchronisée sur l'heure système réelle, qui avance en continu
@@ -91,7 +94,6 @@ const daysEl = document.getElementById("days");
 const countryEl = document.getElementById("country");
 const eventTypeEl = document.getElementById("event-type");
 const refreshBtn = document.getElementById("refresh");
-const demoToggleEl = document.getElementById("demo-toggle");
 const nuclearToggleEl = document.getElementById("nuclear-toggle");
 const militaryToggleEl = document.getElementById("military-toggle");
 const infrastructureToggleEl = document.getElementById("infrastructure-toggle");
@@ -125,34 +127,35 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// Affiche, à côté de chaque case à cocher de couche, si les données
-// viennent réellement de la source live, du mode démo forcé, ou d'un
-// repli automatique suite à une erreur (avec le détail au survol) - pour
-// que "case cochée ou non" ait toujours un résultat visible et expliqué.
-function setLayerBadge(badgeId, source, fallbackReason) {
+// Pastille à côté de chaque couche : nombre d'éléments réels et
+// heure de mise à jour, ou "indisponible" avec la cause au survol. Aucune
+// donnée fabriquée n'est jamais affichée.
+function setLayerBadge(badgeId, { count, source, error } = {}) {
   const el = document.getElementById(badgeId);
   if (!el) return;
   el.classList.remove("badge-live", "badge-demo");
-  if (source === "demo") {
-    el.textContent = "démo";
-    el.title = "Mode démo forcé";
-    el.classList.add("badge-demo");
-  } else if (source === "demo_fallback") {
-    el.textContent = "démo (repli)";
-    el.title = fallbackReason || "Source indisponible, repli automatique";
+  if (error) {
+    el.textContent = "indisponible";
+    el.title = error;
     el.classList.add("badge-demo");
   } else if (source) {
-    el.textContent = "live";
-    el.title = `Source : ${source}`;
+    el.textContent = `${count}`;
+    el.title = `Source : ${source} — ${new Date().toLocaleTimeString("fr-FR")}`;
     el.classList.add("badge-live");
   } else {
     el.textContent = "";
     el.title = "";
   }
-  // Masque la pastille quand elle est vide, plutôt que de laisser un
-  // petit rectangle coloré sans texte (ressemblait à un tiret "—" dans
-  // l'interface).
   el.style.display = el.textContent ? "" : "none";
+}
+
+async function apiJson(url) {
+  const res = await fetch(url);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
 }
 
 async function loadFilters() {
@@ -180,6 +183,70 @@ async function loadFilters() {
   }
 }
 
+// Timeline : les événements chargés sont conservés en mémoire, et le
+// curseur ne fait que régler la date maximale affichée (pas de nouvel
+// appel réseau à chaque déplacement).
+const timelineEl = document.getElementById("timeline");
+const timelineSlider = document.getElementById("timeline-slider");
+const timelineLabel = document.getElementById("timeline-label");
+const timelinePlayBtn = document.getElementById("timeline-play");
+let timelineStart = null; // Date (UTC) correspondant à la position 0
+let timelineTimer = null;
+
+function stopTimelinePlayback() {
+  clearInterval(timelineTimer);
+  timelineTimer = null;
+  timelinePlayBtn.textContent = "▶";
+}
+
+function timelineCutoff() {
+  const day = new Date(timelineStart.getTime() + Number(timelineSlider.value) * 86400000);
+  return day.toISOString().substring(0, 10);
+}
+
+function applyTimeline() {
+  if (!timelineStart) return;
+  const cutoff = timelineCutoff();
+  timelineLabel.textContent = `jusqu'au ${cutoff}`;
+  conflictsLayer.entities.values.forEach((entity) => {
+    const date = entity.properties?.event_date?.getValue();
+    entity.show = !date || date <= cutoff;
+  });
+}
+
+function setupTimeline(features, days) {
+  stopTimelinePlayback();
+  const dated = features.filter((f) => f.properties?.event_date);
+  if (!dated.length) {
+    timelineStart = null;
+    timelineEl.hidden = true;
+    return;
+  }
+  const end = new Date();
+  end.setUTCHours(0, 0, 0, 0);
+  timelineStart = new Date(end.getTime() - Number(days) * 86400000);
+  timelineSlider.max = String(days);
+  timelineSlider.value = String(days);
+  timelineEl.hidden = false;
+  applyTimeline();
+}
+
+timelineSlider.addEventListener("input", () => {
+  stopTimelinePlayback();
+  applyTimeline();
+});
+
+timelinePlayBtn.addEventListener("click", () => {
+  if (timelineTimer) return stopTimelinePlayback();
+  if (Number(timelineSlider.value) >= Number(timelineSlider.max)) timelineSlider.value = "0";
+  timelinePlayBtn.textContent = "⏸";
+  timelineTimer = setInterval(() => {
+    if (Number(timelineSlider.value) >= Number(timelineSlider.max)) return stopTimelinePlayback();
+    timelineSlider.value = String(Number(timelineSlider.value) + 1);
+    applyTimeline();
+  }, 400);
+});
+
 async function loadEvents() {
   statusEl.textContent = "Chargement…";
   conflictsLayer.entities.removeAll();
@@ -187,15 +254,12 @@ async function loadEvents() {
   const days = daysEl.value;
   const country = countryEl.value;
   const eventType = eventTypeEl.value;
-  const demo = demoToggleEl?.checked ? "&demo=true" : "";
 
   const params = new URLSearchParams({ days, event_type: eventType });
   if (country) params.set("country", country);
 
   try {
-    const res = await fetch(`/api/events?${params.toString()}${demo}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const geojson = await res.json();
+    const geojson = await apiJson(`/api/events?${params.toString()}`);
 
     const features = geojson.features || [];
     features.forEach((feature) => {
@@ -222,19 +286,17 @@ async function loadEvents() {
         },
         name,
         description: descriptionParts.join("<br/>"),
+        properties: { event_date: props.event_date || null },
       });
     });
 
+    setupTimeline(features, days);
+
     const time = new Date().toLocaleTimeString("fr-FR");
-    if (geojson.source === "demo_fallback") {
-      statusEl.textContent = `⚠️ ACLED indisponible — données démo affichées (${features.length}) — ${time}`;
-    } else if (geojson.source === "demo") {
-      statusEl.textContent = `Mode démo — ${features.length} événement(s) — ${time}`;
-    } else {
-      statusEl.textContent = `${features.length} événement(s) ACLED — mis à jour ${time}`;
-    }
+    statusEl.textContent = `${features.length} événement(s) ACLED — mis à jour ${time}`;
   } catch (err) {
-    statusEl.textContent = `Erreur de chargement (${err.message})`;
+    setupTimeline([], days);
+    statusEl.textContent = `⚠️ Conflits indisponibles — ${err.message}`;
   }
 }
 
@@ -244,16 +306,12 @@ async function loadEvents() {
 async function loadSimpleLayer({ dataSource, toggleEl, endpoint, color, icon, emptyLabel, badgeId }) {
   dataSource.entities.removeAll();
   if (!toggleEl?.checked) {
-    setLayerBadge(badgeId, null);
+    setLayerBadge(badgeId);
     return;
   }
 
-  const demo = demoToggleEl?.checked ? "?demo=true" : "";
-
   try {
-    const res = await fetch(`${endpoint}${demo}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const geojson = await res.json();
+    const geojson = await apiJson(endpoint);
 
     (geojson.features || []).forEach((feature) => {
       const [lon, lat] = feature.geometry.coordinates;
@@ -280,10 +338,10 @@ async function loadSimpleLayer({ dataSource, toggleEl, endpoint, color, icon, em
       });
     });
 
-    setLayerBadge(badgeId, geojson.source, geojson.fallback_reason);
+    setLayerBadge(badgeId, { count: (geojson.features || []).length, source: geojson.source });
   } catch (err) {
     console.error(`Erreur chargement couche ${endpoint}:`, err);
-    setLayerBadge(badgeId, "demo_fallback", err.message);
+    setLayerBadge(badgeId, { error: err.message });
   }
 }
 
@@ -311,7 +369,6 @@ refreshBtn.addEventListener("click", loadAll);
 daysEl.addEventListener("change", loadEvents);
 countryEl.addEventListener("change", loadEvents);
 eventTypeEl.addEventListener("change", loadEvents);
-demoToggleEl.addEventListener("change", loadAll);
 nuclearToggleEl.addEventListener("change", loadNuclearSites);
 militaryToggleEl.addEventListener("change", loadMilitarySites);
 infrastructureToggleEl.addEventListener("change", loadInfrastructureSites);

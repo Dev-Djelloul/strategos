@@ -54,15 +54,6 @@
     </div>
 
     <div class="toolbar-group">
-      <span class="toolbar-group-label">Mode</span>
-      <div class="toolbar-row">
-        <label class="toggle toggle-muted" title="Force les données factices, sans appel réseau, sur toutes les couches">
-          <input type="checkbox" id="demo-toggle" /> Mode démo forcé
-        </label>
-      </div>
-    </div>
-
-    <div class="toolbar-group">
       <span class="toolbar-group-label">Heure</span>
       <div class="toolbar-row world-clock-row">
         <div class="world-clock-utc">
@@ -78,7 +69,13 @@
     </div>
   </div>
 
-  <div id="cesiumContainer"></div>
+  <div id="cesiumContainer">
+    <div class="timeline" id="timeline" hidden>
+      <button id="timeline-play" class="btn-icon" title="Lecture / pause">▶</button>
+      <input type="range" id="timeline-slider" min="0" max="0" value="0" />
+      <span id="timeline-label" class="timeline-label"></span>
+    </div>
+  </div>
 
   <script>
     window.CESIUM_ION_TOKEN = "{{ cesium_ion_token }}";

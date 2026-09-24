@@ -273,3 +273,35 @@ body {
     margin-left: 0;
   }
 }
+
+.timeline {
+  position: absolute;
+  left: 50%;
+  bottom: 40px;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: min(640px, calc(100% - 2rem));
+  padding: 0.5rem 0.8rem;
+  background: rgba(15, 18, 25, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.timeline[hidden] {
+  display: none;
+}
+
+.timeline input[type="range"] {
+  flex: 1;
+}
+
+.timeline-label {
+  min-width: 11ch;
+  text-align: right;
+  white-space: nowrap;
+}
