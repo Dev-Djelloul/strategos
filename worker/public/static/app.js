@@ -445,7 +445,10 @@ function renderSourceBanner(sources, selected, fatalError) {
       const st = sources?.[s.key];
       if (st?.ok) {
         if (QUALIFIED.includes(s.key)) qualifiedOk = true;
-        return pill(s.key, true, `${st.count} événement(s)`);
+        const upTo = st.meta?.latest_date
+          ? ` · données jusqu'au ${new Date(st.meta.latest_date).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}`
+          : "";
+        return pill(s.key, true, `${st.count} événement(s)${upTo}`);
       }
       return pill(s.key, false, "indisponible", st?.error);
     }).join("");

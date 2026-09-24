@@ -38,7 +38,7 @@ export const CONFLICT_SOURCES: ConflictSourceInfo[] = [
     url: "https://ucdp.uu.se/",
     reliability: "verified",
     kind: "Jeu de données académique évalué par des pairs, événements de violence organisée",
-    freshness: "Publication annuelle (la fenêtre récente est souvent vide)",
+    freshness: "Versions « candidate » mensuelles, environ 2 semaines de décalage (la version annuelle a ~9 mois de retard)",
     coverage: "Mondiale",
     license: "CC BY 4.0 — citer Sundberg & Melander (2013), Journal of Peace Research 50(4)",
     access: "Jeton d'accès gratuit, sur demande auprès de l'équipe UCDP",

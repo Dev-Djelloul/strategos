@@ -141,7 +141,7 @@ export async function fetchConflicts(
   const q = { eventType: opts.eventType, country: opts.country, days: opts.days };
   const fetchers: Record<SourceKey, () => Promise<FeatureCollection>> = {
     acled: () => fetchAcledEvents(env, q),
-    ucdp: () => fetchUcdpEvents(env, q),
+    ucdp: () => fetchUcdpEvents(env, ctx, q),
     gdelt: () => fetchGdeltEvents(env, ctx, q),
   };
   const results = await Promise.allSettled(keys.map((k) => fetchers[k]()));

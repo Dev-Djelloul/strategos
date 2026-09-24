@@ -55,7 +55,10 @@ data — backend FastAPI, globe CesiumJS, plusieurs couches de données.
 ### UCDP (conflits, référence académique)
 
 Jeton gratuit à demander par email à mertcan.yilmaz@pcr.uu.se, puis secret
-`UCDP_ACCESS_TOKEN` (version du jeu de données : `UCDP_GED_VERSION`).
+`UCDP_ACCESS_TOKEN` (5 000 requêtes/jour). Les versions « candidate »
+mensuelles (26.0.N, ~2 semaines de décalage) sont découvertes
+automatiquement et mises en cache 6 h ; `UCDP_GED_VERSION` permet de les
+imposer (liste séparée par des virgules).
 
 ### GDELT (conflits, presse mondiale)
 

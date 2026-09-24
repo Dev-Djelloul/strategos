@@ -55,7 +55,7 @@ async function handleApi(url: URL, env: Env, ctx: Ctx): Promise<Response> {
     case "/api/events":
       return layerResponse("acled", () => fetchAcledEvents(env, parseQuery(url, 1)));
     case "/api/ucdp-events":
-      return layerResponse("ucdp", () => fetchUcdpEvents(env, parseQuery(url, 30)));
+      return layerResponse("ucdp", () => fetchUcdpEvents(env, ctx, parseQuery(url, 30)));
     case "/api/gdelt-events":
       return layerResponse("gdelt", () => fetchGdeltEvents(env, ctx, parseQuery(url, 1)));
 
