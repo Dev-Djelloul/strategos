@@ -68,17 +68,12 @@ Mises en cache dans `.cache/`.
 
 1. Crée un compte gratuit sur https://ion.cesium.com/signup
 2. Génère un token d'accès (Access Tokens dans le dashboard)
-3. Ajoute-le à `.env` : `CESIUM_ION_TOKEN=...`
+3. Renseigne-le dans le secret `CESIUM_ION_TOKEN` (`.dev.vars` en local)
 
-Sans token Cesium Ion, le globe reste plat (ellipsoïde) mais reste
-pleinement fonctionnel - le relief est un bonus visuel, pas un prérequis.
+Sans token, le globe reste plat (ellipsoïde) mais pleinement fonctionnel ;
+le relief, la recherche de lieux et les villes 3D en dépendent.
 
-```bash
-cp .env.example .env
-# puis édite .env avec tes identifiants
-```
-
-`.env` est ignoré par git - ne jamais y committer de vrais identifiants.
+Les secrets ne sont jamais committés (`.dev.vars` est ignoré par git).
 
 ## Architecture
 
