@@ -149,6 +149,10 @@ function setLayerBadge(badgeId, source, fallbackReason) {
     el.textContent = "";
     el.title = "";
   }
+  // Masque la pastille quand elle est vide, plutôt que de laisser un
+  // petit rectangle coloré sans texte (ressemblait à un tiret "—" dans
+  // l'interface).
+  el.style.display = el.textContent ? "" : "none";
 }
 
 async function loadFilters() {
@@ -312,13 +316,26 @@ nuclearToggleEl.addEventListener("change", loadNuclearSites);
 militaryToggleEl.addEventListener("change", loadMilitarySites);
 infrastructureToggleEl.addEventListener("change", loadInfrastructureSites);
 
+// La hauteur repliée/dépliée est calculée depuis le contenu réel
+// (scrollHeight) plutôt qu'une valeur fixe : le nombre de groupes/couches
+// peut varier, une valeur fixe finit toujours par couper quelque chose
+// (c'était le bug avec l'horloge mondiale).
+function syncToolbarHeight() {
+  if (!toolbarEl.classList.contains("collapsed")) {
+    toolbarEl.style.maxHeight = `${toolbarEl.scrollHeight}px`;
+  }
+}
+
 toolbarToggleBtn.addEventListener("click", () => {
   const collapsed = toolbarEl.classList.toggle("collapsed");
   toolbarToggleBtn.textContent = collapsed ? "▼" : "▲";
   toolbarToggleBtn.setAttribute("aria-expanded", String(!collapsed));
+  if (!collapsed) syncToolbarHeight();
 });
 
-loadFilters().then(loadAll);
+new ResizeObserver(syncToolbarHeight).observe(toolbarEl);
+
+loadFilters().then(loadAll).then(syncToolbarHeight);
 
 // Horloge mondiale : UTC + quelques fuseaux stratégiques, intégrée dans
 // la barre d'outils, mise à jour chaque seconde via l'API Intl native du

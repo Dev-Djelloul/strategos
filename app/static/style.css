@@ -73,12 +73,15 @@ body {
   background: var(--panel);
   border-bottom: 1px solid var(--border);
   overflow: hidden;
-  max-height: 200px;
+  /* La hauteur max est calculée dynamiquement en JS (scrollHeight) plutôt
+     qu'une valeur fixe ici - un nombre de couches variable ferait sinon
+     couper le contenu (c'était le bug : l'horloge dépassait des 200px
+     fixés en dur). */
   transition: max-height 0.25s ease, padding 0.25s ease, opacity 0.2s ease;
 }
 
 .toolbar.collapsed {
-  max-height: 0;
+  max-height: 0 !important;
   padding-top: 0;
   padding-bottom: 0;
   opacity: 0;
