@@ -1,0 +1,72 @@
+/** Client Overpass (OpenStreetMap) : instances publiques essayées dans
+ * l'ordre, timeouts silencieux détectés, résultat mis en cache KV. */
+import type { Ctx, Env, Feature, FeatureCollection } from "../types.ts";
+import { USER_AGENT } from "../types.ts";
+import { cachedFetch, errMessage } from "../cache.ts";
+
+const OVERPASS_URLS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+];
+const CACHE_TTL_SECONDS = 6 * 3600;
+
+interface OsmElement {
+  type: string;
+  lat?: number;
+  lon?: number;
+  center?: { lat: number; lon: number };
+  tags?: Record<string, string>;
+}
+
+function toGeoJson(elements: OsmElement[], nameFallback: string): FeatureCollection {
+  const features: Feature[] = [];
+  for (const el of elements) {
+    const p = el.type === "node" ? el : el.center;
+    if (p?.lat === undefined || p?.lon === undefined) continue;
+    const tags = el.tags ?? {};
+    features.push({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [p.lon, p.lat] },
+      properties: {
+        name: tags.name ?? nameFallback,
+        type: tags.military ?? tags.aeroway ?? tags.power ?? tags.landuse ?? null,
+        operator: tags.operator ?? null,
+      },
+    });
+  }
+  return { type: "FeatureCollection", features };
+}
+
+async function queryMirrors(queryQl: string): Promise<{ elements?: OsmElement[]; remark?: string }> {
+  let last: unknown = new Error("Overpass indisponible");
+  for (const url of OVERPASS_URLS) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "User-Agent": USER_AGENT },
+        body: new URLSearchParams({ data: queryQl }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const payload = (await res.json()) as { elements?: OsmElement[]; remark?: string };
+      // Overpass répond 200 avec 0 élément et une "remark" quand la requête
+      // dépasse son temps alloué : c'est une panne, pas un résultat vide.
+      if ((payload.remark ?? "").includes("runtime error")) throw new Error(payload.remark);
+      return payload;
+    } catch (e) {
+      last = new Error(`${new URL(url).host} : ${errMessage(e)}`);
+    }
+  }
+  throw last;
+}
+
+export function queryOverpass(
+  env: Env,
+  ctx: Ctx,
+  queryQl: string,
+  cacheKey: string,
+  nameFallback: string,
+): Promise<FeatureCollection> {
+  return cachedFetch(env, ctx, `overpass_${cacheKey}`, CACHE_TTL_SECONDS, async () =>
+    toGeoJson((await queryMirrors(queryQl)).elements ?? [], nameFallback),
+  );
+}
