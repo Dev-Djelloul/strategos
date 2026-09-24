@@ -85,8 +85,8 @@ export async function fetchAcledEvents(
   if (!res.ok) {
     const hint =
       res.status === 403
-        ? " — accès aux événements non accordé : les adresses génériques (gmail…) n'ont que le niveau Open " +
-          "(données agrégées). Voir README, section ACLED."
+        ? " — accès API non accordé : ACLED ne l'ouvre plus aux adresses email personnelles " +
+          "(niveau Open = données agrégées seulement). Il faut une adresse académique ou institutionnelle."
         : "";
     throw new Error(`ACLED a refusé la requête (${res.status}): ${(await res.text()).slice(0, 200)}${hint}`);
   }

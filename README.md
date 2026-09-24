@@ -44,13 +44,15 @@ data — backend FastAPI, globe CesiumJS, plusieurs couches de données.
 
 1. Crée un compte sur https://acleddata.com/user/register
 2. Renseigne ton email/mot de passe ACLED dans les secrets du Worker (`ACLED_EMAIL`, `ACLED_PASSWORD`)
-3. **Le niveau d'accès conditionne l'API** : une adresse générique (gmail…)
-   reçoit le niveau *Open* (données agrégées seulement, pas d'événements
-   → erreur 403). Les événements détaillés (décalés d'environ une semaine)
-   nécessitent le niveau *Research* ou supérieur, attribué selon le domaine
-   email de l'organisation, ou sur demande à access@acleddata.com
-   (licences : licensing@acleddata.com). Tant que l'accès n'est pas
-   accordé, la couche indique « indisponible ».
+3. **L'API d'événements n'est plus ouverte aux adresses personnelles**
+   (confirmé par l'équipe ACLED, y compris pour des chercheurs
+   indépendants) : elles reçoivent le niveau *Open* (données agrégées
+   seulement → erreur 403). Il faut une adresse **académique ou
+   institutionnelle** : se réinscrire avec elle, puis écrire à
+   access@acleddata.com pour faire supprimer l'ancien compte et évaluer le
+   niveau (les événements détaillés, décalés d'environ une semaine,
+   demandent *Research* ou plus). Tant que ce n'est pas fait, la couche
+   indique « indisponible » (aucune donnée factice).
 
 ### UCDP (conflits, référence académique)
 

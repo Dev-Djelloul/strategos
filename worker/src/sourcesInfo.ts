@@ -28,7 +28,7 @@ export const CONFLICT_SOURCES: ConflictSourceInfo[] = [
     freshness: "Hebdomadaire (niveau Research : événements décalés d'environ une semaine)",
     coverage: "Mondiale",
     license: "Conditions d'utilisation ACLED — attribution obligatoire, pas de redistribution",
-    access: "Compte myACLED ; l'API d'événements exige le niveau Research ou supérieur",
+    access: "Compte myACLED avec une adresse académique ou institutionnelle ; les adresses personnelles n'ont plus accès à l'API (niveau Open : données agrégées seulement)",
     secrets: ["ACLED_EMAIL", "ACLED_PASSWORD"],
   },
   {
