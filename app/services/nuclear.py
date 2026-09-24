@@ -7,9 +7,9 @@ militaires non déclarées).
 Le résultat est mis en cache en mémoire (ces données changent rarement)
 pour éviter de solliciter Wikidata à chaque requête.
 """
-import time
-
 import httpx
+
+from app.services.cache import cached_fetch
 
 SPARQL_URL = "https://query.wikidata.org/sparql"
 
@@ -30,7 +30,6 @@ REQUEST_HEADERS = {
     "User-Agent": "Strategos/0.1 (projet pedagogique; contact: digitalblueskye@gmail.com)",
 }
 
-_cache: dict = {"data": None, "expires_at": 0}
 CACHE_TTL_SECONDS = 24 * 3600
 
 
@@ -44,12 +43,8 @@ def _parse_point(coord_wkt: str):
         return None
 
 
-async def fetch_nuclear_sites() -> dict:
-    now = time.time()
-    if _cache["data"] is not None and _cache["expires_at"] > now:
-        return _cache["data"]
-
-    async with httpx.AsyncClient(timeout=30.0, headers=REQUEST_HEADERS) as client:
+async def _fetch_from_wikidata() -> dict:
+    async with httpx.AsyncClient(timeout=60.0, headers=REQUEST_HEADERS) as client:
         response = await client.get(SPARQL_URL, params={"query": SPARQL_QUERY, "format": "json"})
         response.raise_for_status()
         payload = response.json()
@@ -73,7 +68,8 @@ async def fetch_nuclear_sites() -> dict:
             },
         })
 
-    result = {"type": "FeatureCollection", "features": features}
-    _cache["data"] = result
-    _cache["expires_at"] = now + CACHE_TTL_SECONDS
-    return result
+    return {"type": "FeatureCollection", "features": features}
+
+
+async def fetch_nuclear_sites() -> dict:
+    return await cached_fetch("wikidata_nuclear", CACHE_TTL_SECONDS, _fetch_from_wikidata)

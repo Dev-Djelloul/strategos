@@ -29,7 +29,7 @@ const viewer = new Cesium.Viewer("cesiumContainer", {
   animation: false,
   timeline: false,
   fullscreenButton: false,
-  infoBox: true,
+  infoBox: false, // remplacé par le panneau latéral (#side-panel)
   selectionIndicator: true,
   baseLayer: new Cesium.ImageryLayer(satelliteImagery),
   terrainProvider,
@@ -148,9 +148,9 @@ new ResizeObserver(() => viewer.resize()).observe(document.getElementById("cesiu
 // Une couche par source de conflits : ACLED (données qualifiées), UCDP
 // (référence académique) et GDELT (presse mondiale, non vérifié).
 const EVENT_SOURCES = [
-  { key: "acled", label: "ACLED", endpoint: "/api/events", toggleId: "acled-toggle", badgeId: "acled-badge", layer: new Cesium.CustomDataSource("acled") },
-  { key: "ucdp", label: "UCDP", endpoint: "/api/ucdp-events", toggleId: "ucdp-toggle", badgeId: "ucdp-badge", layer: new Cesium.CustomDataSource("ucdp") },
-  { key: "gdelt", label: "GDELT", endpoint: "/api/gdelt-events", toggleId: "gdelt-toggle", badgeId: "gdelt-badge", layer: new Cesium.CustomDataSource("gdelt") },
+  { key: "acled", label: "ACLED", endpoint: "/api/events", toggleId: "acled-toggle", badgeId: "acled-badge", reliability: "verified", layer: new Cesium.CustomDataSource("acled") },
+  { key: "ucdp", label: "UCDP", endpoint: "/api/ucdp-events", toggleId: "ucdp-toggle", badgeId: "ucdp-badge", reliability: "verified", layer: new Cesium.CustomDataSource("ucdp") },
+  { key: "gdelt", label: "GDELT", endpoint: "/api/gdelt-events", toggleId: "gdelt-toggle", badgeId: "gdelt-badge", reliability: "press", layer: new Cesium.CustomDataSource("gdelt") },
 ];
 const nuclearLayer = new Cesium.CustomDataSource("nuclear");
 const militaryLayer = new Cesium.CustomDataSource("military");
@@ -201,24 +201,85 @@ function escapeHtml(str) {
 // Pastille à côté de chaque couche : nombre d'éléments réels et
 // heure de mise à jour, ou "indisponible" avec la cause au survol. Aucune
 // donnée fabriquée n'est jamais affichée.
-function setLayerBadge(badgeId, { count, source, error } = {}) {
+function setLayerBadge(badgeId, { count, source, error, fetchedAt, stale, staleReason, loading } = {}) {
   const el = document.getElementById(badgeId);
   if (!el) return;
   el.classList.remove("badge-live", "badge-demo");
-  if (error) {
+  if (loading) {
+    el.textContent = "chargement…";
+    el.title = "Première récupération d'une source lente, en cours côté serveur";
+  } else if (error) {
     el.textContent = "indisponible";
     el.title = error;
     el.classList.add("badge-demo");
   } else if (source) {
-    el.textContent = `${count}`;
-    el.title = `Source : ${source} — ${new Date().toLocaleTimeString("fr-FR")}`;
-    el.classList.add("badge-live");
+    const when = fetchedAt ? new Date(fetchedAt) : new Date();
+    if (stale) {
+      // Source injoignable : dernière donnée RÉELLE en cache, horodatée.
+      el.textContent = `${count} · du ${when.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })} ${when.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
+      el.title = `Source injoignable (${staleReason || "erreur"}) — dernière donnée réelle en cache, récupérée le ${when.toLocaleString("fr-FR")}`;
+      el.classList.add("badge-demo");
+    } else {
+      el.textContent = `${count}`;
+      el.title = `Source : ${source} — données du ${when.toLocaleString("fr-FR")}`;
+      el.classList.add("badge-live");
+    }
   } else {
     el.textContent = "";
     el.title = "";
   }
   el.style.display = el.textContent ? "" : "none";
 }
+
+// Panneau latéral : détail de l'élément sélectionné sur le globe. Chaque
+// entité enregistre ses infos ici (clé = entité), lues à la sélection.
+const panelInfo = new WeakMap();
+const RELIABILITY = {
+  verified: { label: "Source qualifiée", cls: "rel-verified" },
+  press: { label: "Presse — non vérifié", cls: "rel-press" },
+  community: { label: "Base collaborative", cls: "rel-community" },
+};
+const sidePanelEl = document.getElementById("side-panel");
+const sidePanelBody = document.getElementById("side-panel-body");
+
+function showSidePanel(info) {
+  const rel = RELIABILITY[info.reliability] || RELIABILITY.community;
+  const rows = (info.rows || [])
+    .filter(([, v]) => v !== undefined && v !== null && v !== "")
+    .map(([k, v]) => `<div class="sp-row"><dt>${escapeHtml(k)}</dt><dd>${escapeHtml(String(v))}</dd></div>`)
+    .join("");
+  const link = /^https?:\/\//.test(info.url || "")
+    ? `<a class="sp-link" href="${escapeHtml(info.url)}" target="_blank" rel="noopener noreferrer">Ouvrir la source ↗</a>`
+    : "";
+  sidePanelBody.innerHTML = `
+    <div class="sp-kind">${escapeHtml(info.kind || "")}</div>
+    <h2 class="sp-title">${escapeHtml(info.title || "Sans nom")}</h2>
+    <div class="sp-source"><span class="sp-rel ${rel.cls}">${rel.label}</span> <span>${escapeHtml(info.sourceLabel || "")}</span></div>
+    <dl class="sp-rows">${rows}</dl>
+    ${info.notes ? `<p class="sp-notes">${escapeHtml(info.notes)}</p>` : ""}
+    ${link}
+    <button class="btn-primary sp-zoom" id="sp-zoom">Zoomer sur le lieu</button>`;
+  document.getElementById("sp-zoom").addEventListener("click", () => {
+    viewer.camera.flyToBoundingSphere(
+      new Cesium.BoundingSphere(Cesium.Cartesian3.fromDegrees(info.lon, info.lat, 0), 3000),
+      { duration: 2, offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-40), 25000) }
+    );
+  });
+  sidePanelEl.classList.add("open");
+}
+
+function hideSidePanel() {
+  sidePanelEl.classList.remove("open");
+}
+
+document.getElementById("side-panel-close").addEventListener("click", () => {
+  viewer.selectedEntity = undefined;
+});
+viewer.selectedEntityChanged.addEventListener((entity) => {
+  const info = entity && panelInfo.get(entity);
+  if (info) showSidePanel(info);
+  else hideSidePanel();
+});
 
 async function apiJson(url) {
   const res = await fetch(url);
@@ -334,17 +395,7 @@ async function loadEventSource(src, params) {
       const props = feature.properties || {};
       const color = EVENT_COLORS[props.event_type] || Cesium.Color.fromCssColorString("#e05a56");
 
-      const parts = [`<strong>Source :</strong> ${src.label}`];
-      if (props.event_type) parts.push(`<strong>Type :</strong> ${escapeHtml(EVENT_TYPE_LABELS[props.event_type] || props.event_type)}`);
-      if (props.fatalities !== undefined && props.fatalities !== null) parts.push(`<strong>Victimes :</strong> ${escapeHtml(String(props.fatalities))}`);
-      if (props.event_date) parts.push(`<strong>Date :</strong> ${escapeHtml(props.event_date)}`);
-      if (props.count) parts.push(`<strong>Mentions :</strong> ${escapeHtml(String(props.count))}`);
-      if (props.notes) parts.push(`<p>${escapeHtml(props.notes)}</p>`);
-      if (/^https?:\/\//.test(props.source_url || "")) {
-        parts.push(`<a href="${escapeHtml(props.source_url)}" target="_blank" rel="noopener noreferrer">Article source</a>`);
-      }
-
-      src.layer.entities.add({
+      const entity = src.layer.entities.add({
         position: Cesium.Cartesian3.fromDegrees(lon, lat),
         point: {
           pixelSize: 9,
@@ -354,11 +405,25 @@ async function loadEventSource(src, params) {
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
         },
         name: props.name || "Événement",
-        description: parts.join("<br/>"),
         properties: { event_date: props.event_date || null },
       });
+      panelInfo.set(entity, {
+        kind: EVENT_TYPE_LABELS[props.event_type] || props.event_type || "Événement",
+        title: props.name || "Événement",
+        sourceLabel: src.label,
+        reliability: src.reliability,
+        rows: [
+          ["Date", props.event_date],
+          ["Victimes", props.fatalities],
+          ["Mentions presse", props.count],
+        ],
+        notes: props.notes,
+        url: props.source_url,
+        lon,
+        lat,
+      });
     });
-    setLayerBadge(src.badgeId, { count: features.length, source: geojson.source });
+    setLayerBadge(src.badgeId, { count: features.length, source: geojson.source, fetchedAt: geojson.fetched_at, stale: geojson.stale, staleReason: geojson.stale_reason });
     return features.length;
   } catch (err) {
     setLayerBadge(src.badgeId, { error: err.message });
@@ -382,7 +447,7 @@ async function loadEvents() {
 // Couche générique pour les points simples (nucléaire, militaire,
 // infrastructures) : même structure GeoJSON, seul le style et
 // l'endpoint changent.
-async function loadSimpleLayer({ dataSource, toggleEl, endpoint, color, icon, emptyLabel, badgeId }) {
+async function loadSimpleLayer({ dataSource, toggleEl, endpoint, color, icon, emptyLabel, badgeId, kindLabel, sourceLabel, retry = 0 }) {
   dataSource.entities.removeAll();
   if (!toggleEl?.checked) {
     setLayerBadge(badgeId);
@@ -397,13 +462,7 @@ async function loadSimpleLayer({ dataSource, toggleEl, endpoint, color, icon, em
       const props = feature.properties || {};
       const name = props.name || emptyLabel;
 
-      const descriptionParts = [];
-      if (props.country) descriptionParts.push(`<strong>Pays :</strong> ${escapeHtml(props.country)}`);
-      if (props.status) descriptionParts.push(`<strong>Statut :</strong> ${escapeHtml(props.status)}`);
-      if (props.type) descriptionParts.push(`<strong>Type :</strong> ${escapeHtml(props.type)}`);
-      if (props.operator) descriptionParts.push(`<strong>Opérateur :</strong> ${escapeHtml(props.operator)}`);
-
-      dataSource.entities.add({
+      const entity = dataSource.entities.add({
         position: Cesium.Cartesian3.fromDegrees(lon, lat),
         point: {
           pixelSize: 10,
@@ -413,12 +472,32 @@ async function loadSimpleLayer({ dataSource, toggleEl, endpoint, color, icon, em
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
         },
         name: `${icon} ${name}`,
-        description: descriptionParts.join("<br/>"),
+      });
+      panelInfo.set(entity, {
+        kind: `${icon} ${kindLabel}`,
+        title: name,
+        sourceLabel,
+        reliability: "community",
+        rows: [
+          ["Pays", props.country],
+          ["Statut", props.status],
+          ["Type", props.type],
+          ["Opérateur", props.operator],
+        ],
+        lon,
+        lat,
       });
     });
 
-    setLayerBadge(badgeId, { count: (geojson.features || []).length, source: geojson.source });
+    setLayerBadge(badgeId, { count: (geojson.features || []).length, source: geojson.source, fetchedAt: geojson.fetched_at, stale: geojson.stale, staleReason: geojson.stale_reason });
   } catch (err) {
+    if (err.message.includes("en cours") && retry < 12) {
+      // Source lente en premier chargement : le serveur la prépare en
+      // arrière-plan, on réessaie sans bloquer l'interface.
+      setLayerBadge(badgeId, { loading: true });
+      setTimeout(() => loadSimpleLayer({ dataSource, toggleEl, endpoint, color, icon, emptyLabel, badgeId, kindLabel, sourceLabel, retry: retry + 1 }), 15000);
+      return;
+    }
     console.error(`Erreur chargement couche ${endpoint}:`, err);
     setLayerBadge(badgeId, { error: err.message });
   }
@@ -426,15 +505,15 @@ async function loadSimpleLayer({ dataSource, toggleEl, endpoint, color, icon, em
 
 const loadNuclearSites = () => loadSimpleLayer({
   dataSource: nuclearLayer, toggleEl: nuclearToggleEl, endpoint: "/api/nuclear-sites",
-  color: NUCLEAR_COLOR, icon: "☢️", emptyLabel: "Site nucléaire", badgeId: "nuclear-badge",
+  color: NUCLEAR_COLOR, icon: "☢️", emptyLabel: "Site nucléaire", badgeId: "nuclear-badge", kindLabel: "Installation nucléaire civile", sourceLabel: "Wikidata",
 });
 const loadMilitarySites = () => loadSimpleLayer({
   dataSource: militaryLayer, toggleEl: militaryToggleEl, endpoint: "/api/military-sites",
-  color: MILITARY_COLOR, icon: "🎖️", emptyLabel: "Site militaire", badgeId: "military-badge",
+  color: MILITARY_COLOR, icon: "🎖️", emptyLabel: "Site militaire", badgeId: "military-badge", kindLabel: "Site militaire", sourceLabel: "OpenStreetMap",
 });
 const loadInfrastructureSites = () => loadSimpleLayer({
   dataSource: infrastructureLayer, toggleEl: infrastructureToggleEl, endpoint: "/api/infrastructure-sites",
-  color: INFRASTRUCTURE_COLOR, icon: "🛫", emptyLabel: "Infrastructure", badgeId: "infrastructure-badge",
+  color: INFRASTRUCTURE_COLOR, icon: "🛫", emptyLabel: "Infrastructure", badgeId: "infrastructure-badge", kindLabel: "Infrastructure", sourceLabel: "OpenStreetMap",
 });
 
 function loadAll() {

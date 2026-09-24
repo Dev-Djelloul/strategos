@@ -7,14 +7,17 @@ peuvent être très lourdes et se faire rejeter par l'instance publique
 un nom (name=*) pour ne garder que les sites notables/identifiés, et on
 plafonne le nombre de résultats.
 """
-import time
-
 import httpx
 
-OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+from app.services.cache import cached_fetch
+
+# Instances publiques essayées dans l'ordre (la première est souvent saturée).
+OVERPASS_URLS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+]
 REQUEST_HEADERS = {"User-Agent": "Strategos/0.1 (projet pedagogique; contact: digitalblueskye@gmail.com)"}
 
-_cache: dict = {}
 CACHE_TTL_SECONDS = 6 * 3600
 
 
@@ -42,17 +45,28 @@ def _elements_to_geojson(elements: list, name_fallback: str) -> dict:
     return {"type": "FeatureCollection", "features": features}
 
 
+async def _query_mirrors(query_ql: str) -> dict:
+    last_exc: Exception = RuntimeError("Overpass indisponible")
+    async with httpx.AsyncClient(timeout=60.0, headers=REQUEST_HEADERS) as client:
+        for url in OVERPASS_URLS:
+            try:
+                response = await client.post(url, data={"data": query_ql})
+                response.raise_for_status()
+                payload = response.json()
+                # Overpass répond 200 avec 0 élément et une "remark" quand la
+                # requête dépasse son temps alloué : c'est une panne, pas un
+                # résultat vide.
+                if "runtime error" in (payload.get("remark") or ""):
+                    raise RuntimeError(payload["remark"])
+                return payload
+            except Exception as exc:  # noqa: BLE001
+                last_exc = RuntimeError(f"{url.split('/')[2]} : {str(exc) or type(exc).__name__}")
+    raise last_exc
+
+
 async def query_overpass(query_ql: str, cache_key: str, name_fallback: str = "Site") -> dict:
-    now = time.time()
-    cached = _cache.get(cache_key)
-    if cached and cached["expires_at"] > now:
-        return cached["data"]
+    async def fetch() -> dict:
+        payload = await _query_mirrors(query_ql)
+        return _elements_to_geojson(payload.get("elements", []), name_fallback)
 
-    async with httpx.AsyncClient(timeout=30.0, headers=REQUEST_HEADERS) as client:
-        response = await client.post(OVERPASS_URL, data={"data": query_ql})
-        response.raise_for_status()
-        payload = response.json()
-
-    result = _elements_to_geojson(payload.get("elements", []), name_fallback)
-    _cache[cache_key] = {"data": result, "expires_at": now + CACHE_TTL_SECONDS}
-    return result
+    return await cached_fetch(f"overpass_{cache_key}", CACHE_TTL_SECONDS, fetch)

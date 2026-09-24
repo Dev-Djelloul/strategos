@@ -1,4 +1,6 @@
+import asyncio
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
@@ -19,7 +21,23 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent
 
-app = FastAPI(title="Strategos")
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # Préchauffe les couches lentes (Overpass, Wikidata) en arrière-plan :
+    # à la première ouverture de la page, le cache est déjà prêt.
+    async def warm(fn):
+        try:
+            await fn()
+        except Exception:  # noqa: BLE001 - simple préchauffage, l'erreur sera rejouée à la demande
+            pass
+
+    tasks = [asyncio.create_task(warm(fn)) for fn in (fetch_nuclear_sites, fetch_military_sites, fetch_infrastructure_sites)]
+    yield
+    for t in tasks:
+        t.cancel()
+
+
+app = FastAPI(title="Strategos", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
