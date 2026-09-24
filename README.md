@@ -114,6 +114,8 @@ npm test                  # tests unitaires
 
 ## Déploiement Cloudflare
 
+Déployé sur https://strategos.djelloulabid75.workers.dev (usage personnel).
+
 ```bash
 cd worker
 npx wrangler kv namespace create strategos-cache  # copier l'id dans wrangler.jsonc
