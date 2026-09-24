@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Strategos — Globe des conflits</title>
   <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Widgets/widgets.css" />
-  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}" />
 </head>
 <body>
   <header class="topbar">
@@ -70,6 +70,13 @@
           <label for="region">Aller à</label>
           <select id="region"><option value="">Choisir une région…</option></select>
         </div>
+        <div class="field zone-field">
+          <label>Cadre de zone</label>
+          <div class="zone-buttons">
+            <button id="zone-view" class="btn-secondary" title="Limite toutes les couches à la zone actuellement visible">⬚ Cadrer la vue</button>
+            <button id="zone-clear" class="btn-secondary" title="Retire le cadre">Toute la planète</button>
+          </div>
+        </div>
         <label class="toggle" title="Villes et reliefs en 3D photoréaliste (Google Photorealistic 3D Tiles via Cesium Ion), à zoom rapproché"><input type="checkbox" id="photo3d-toggle" /> Villes 3D photoréalistes</label>
       </div>
     </div>
@@ -86,6 +93,7 @@
     </div>
 
     <div class="toolbar-status">
+      <span id="zone-label" class="status">Zone : toute la planète</span>
       <span id="status" class="status"></span>
     </div>
   </div>
@@ -107,6 +115,6 @@
     window.CESIUM_ION_TOKEN = "{{ cesium_ion_token }}";
   </script>
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Cesium.js"></script>
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v={{ asset_version }}"></script>
 </body>
 </html>

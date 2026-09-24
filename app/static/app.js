@@ -76,16 +76,16 @@ viewer.camera.flyHome(0);
 // vue inclinée (perspective 3D plutôt que vue à la verticale). Le moteur
 // de recherche de lieux (loupe en haut à droite du globe) complète.
 const REGIONS = [
-  { name: "Ukraine", lon: 31.5, lat: 48.5, range: 1100000 },
-  { name: "Gaza / Israël / Liban", lon: 35.0, lat: 32.0, range: 350000 },
-  { name: "Syrie", lon: 38.0, lat: 35.0, range: 700000 },
-  { name: "Soudan", lon: 30.0, lat: 15.5, range: 1500000 },
-  { name: "Yémen / mer Rouge", lon: 44.0, lat: 15.0, range: 1200000 },
-  { name: "Sahel (Mali)", lon: -2.0, lat: 15.0, range: 1500000 },
-  { name: "Afghanistan", lon: 66.0, lat: 34.0, range: 1200000 },
-  { name: "Iran / Golfe", lon: 53.0, lat: 30.5, range: 1800000 },
-  { name: "Taïwan / mer de Chine", lon: 121.0, lat: 24.0, range: 1000000 },
-  { name: "Corée", lon: 127.5, lat: 37.5, range: 900000 },
+  { name: "Ukraine", bbox: [22, 44, 41, 53], lon: 31.5, lat: 48.5, range: 1100000 },
+  { name: "Gaza / Israël / Liban", bbox: [33.5, 29, 37, 34.7], lon: 35.0, lat: 32.0, range: 350000 },
+  { name: "Syrie", bbox: [35.5, 32, 42.5, 37.5], lon: 38.0, lat: 35.0, range: 700000 },
+  { name: "Soudan", bbox: [21.5, 8.5, 39, 23], lon: 30.0, lat: 15.5, range: 1500000 },
+  { name: "Yémen / mer Rouge", bbox: [41, 11, 54, 19], lon: 44.0, lat: 15.0, range: 1200000 },
+  { name: "Sahel (Mali)", bbox: [-13, 10, 5, 25], lon: -2.0, lat: 15.0, range: 1500000 },
+  { name: "Afghanistan", bbox: [60.5, 29, 75, 38.5], lon: 66.0, lat: 34.0, range: 1200000 },
+  { name: "Iran / Golfe", bbox: [44, 24, 63.5, 40], lon: 53.0, lat: 30.5, range: 1800000 },
+  { name: "Taïwan / mer de Chine", bbox: [117, 20, 124, 27], lon: 121.0, lat: 24.0, range: 1000000 },
+  { name: "Corée", bbox: [124, 33, 131.5, 43], lon: 127.5, lat: 37.5, range: 900000 },
   { name: "Monde", lon: 10.0, lat: 20.0, range: 22000000, pitch: -90 },
 ];
 
@@ -99,6 +99,7 @@ REGIONS.forEach((r, i) => {
 regionEl.addEventListener("change", () => {
   const r = REGIONS[Number(regionEl.value)];
   if (!r) return;
+  setZone(r.bbox || null); // "Monde" : pas de cadre
   viewer.camera.flyToBoundingSphere(
     new Cesium.BoundingSphere(Cesium.Cartesian3.fromDegrees(r.lon, r.lat, 0), r.range / 4),
     {
@@ -189,6 +190,12 @@ const EVENT_COLORS = {
   casualties: Cesium.Color.fromCssColorString("#8b1a1a"),
   ceasefire: Cesium.Color.fromCssColorString("#4caf7d"),
 };
+
+// Les points ne sont plus dessinés à travers la planète (les événements de
+// l'autre face du globe apparaissaient par-dessus la vue). Le test de
+// profondeur n'est désactivé qu'à faible distance de la caméra, pour éviter
+// qu'un point posé au sol soit avalé par le relief lors d'un zoom serré.
+const POINT_DEPTH_DISTANCE = 30000;
 
 const NUCLEAR_COLOR = Cesium.Color.fromCssColorString("#f4d03f");
 const MILITARY_COLOR = Cesium.Color.fromCssColorString("#5b8def");
@@ -346,13 +353,12 @@ function timelineCutoff() {
 }
 
 function applyTimeline() {
-  if (!timelineStart) return;
-  const cutoff = timelineCutoff();
-  timelineLabel.textContent = `jusqu'au ${cutoff}`;
+  const cutoff = timelineStart ? timelineCutoff() : null;
+  if (cutoff) timelineLabel.textContent = `jusqu'au ${cutoff}`;
   conflictsLayer.entities.values.forEach((entity) => {
     const date = entity.properties?.event_date?.getValue();
     const conf = entity.properties?.confidence?.getValue();
-    entity.show = (!date || date <= cutoff) && (showPressOnly || conf !== "press");
+    entity.show = (!cutoff || !date || date <= cutoff) && (showPressOnly || conf !== "press") && entityInZone(entity);
   });
 }
 
@@ -362,6 +368,7 @@ function setupTimeline(days) {
   if (!hasDated) {
     timelineStart = null;
     timelineEl.hidden = true;
+    applyTimeline();
     return;
   }
   const end = new Date();
@@ -433,7 +440,7 @@ async function loadEvents() {
           color,
           outlineColor: style.outline,
           outlineWidth: style.outlineWidth,
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          disableDepthTestDistance: POINT_DEPTH_DISTANCE,
         },
         name: props.name || "Événement",
         properties: { event_date: props.event_date || null, confidence: props.confidence },
@@ -495,7 +502,7 @@ async function loadSimpleLayer({ dataSource, toggleEl, endpoint, color, icon, em
           color,
           outlineColor: Cesium.Color.BLACK,
           outlineWidth: 2,
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          disableDepthTestDistance: POINT_DEPTH_DISTANCE,
         },
         name: `${icon} ${name}`,
       });
@@ -515,6 +522,7 @@ async function loadSimpleLayer({ dataSource, toggleEl, endpoint, color, icon, em
       });
     });
 
+    applyZone();
     setLayerBadge(badgeId, { count: (geojson.features || []).length, source: geojson.source, fetchedAt: geojson.fetched_at, stale: geojson.stale, staleReason: geojson.stale_reason });
   } catch (err) {
     if (err.message.includes("en cours") && retry < 12) {
@@ -580,6 +588,60 @@ toolbarToggleBtn.addEventListener("click", () => {
 });
 
 new ResizeObserver(syncToolbarHeight).observe(toolbarEl);
+
+
+// Cadre de zone : quand une région est active, seuls les éléments situés
+// dans son cadre réel sont affichés (sur toutes les couches), et le cadre
+// est tracé sur le globe. "Toute la planète" retire le cadre.
+let activeZone = null; // [ouest, sud, est, nord] en degrés
+const zoneLayer = new Cesium.CustomDataSource("zone");
+viewer.dataSources.add(zoneLayer);
+const zoneLabelEl = document.getElementById("zone-label");
+
+function entityInZone(entity) {
+  if (!activeZone) return true;
+  const info = panelInfo.get(entity);
+  if (!info) return true;
+  const [w, s, e, n] = activeZone;
+  return info.lon >= w && info.lon <= e && info.lat >= s && info.lat <= n;
+}
+
+function applyZone() {
+  applyTimeline();
+  [nuclearLayer, militaryLayer, infrastructureLayer].forEach((layer) => {
+    layer.entities.values.forEach((entity) => { entity.show = entityInZone(entity); });
+  });
+}
+
+function setZone(bbox) {
+  activeZone = bbox;
+  zoneLayer.entities.removeAll();
+  if (bbox) {
+    const [w, s, e, n] = bbox;
+    zoneLayer.entities.add({
+      polyline: {
+        positions: Cesium.Cartesian3.fromDegreesArray([w, s, e, s, e, n, w, n, w, s]),
+        width: 2,
+        clampToGround: true,
+        material: Cesium.Color.fromCssColorString("#5b8def").withAlpha(0.9),
+      },
+    });
+  }
+  zoneLabelEl.textContent = bbox ? `Zone : ${bbox.map((v) => v.toFixed(1)).join(" / ")}` : "Zone : toute la planète";
+  applyZone();
+}
+
+document.getElementById("zone-view").addEventListener("click", () => {
+  const rect = viewer.camera.computeViewRectangle();
+  if (!rect) return setZone(null);
+  const deg = Cesium.Math.toDegrees;
+  setZone([deg(rect.west), deg(rect.south), deg(rect.east), deg(rect.north)]);
+  regionEl.value = "";
+});
+document.getElementById("zone-clear").addEventListener("click", () => {
+  setZone(null);
+  regionEl.value = "";
+});
 
 loadFilters().then(loadAll).then(syncToolbarHeight);
 

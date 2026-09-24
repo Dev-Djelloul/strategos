@@ -439,3 +439,19 @@ body {
 .sp-sources a { color: #5b8def; }
 .sp-src-detail { color: var(--muted); }
 .sp-src-notes { margin-top: 3px; color: var(--muted); }
+
+.zone-buttons { display: flex; gap: 6px; }
+
+.btn-secondary {
+  background: var(--panel-raised);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.btn-secondary:hover { border-color: var(--muted); }
+
+.toolbar-status { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }

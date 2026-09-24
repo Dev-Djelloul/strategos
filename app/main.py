@@ -63,6 +63,9 @@ async def index(request: Request):
             "request": request,
             # Optionnel : sans token, le globe reste plat (ellipsoïde) au
             # lieu d'afficher le relief. Compte gratuit sur ion.cesium.com.
+            # Cache-busting : le navigateur recharge les fichiers modifiés
+            # au lieu de servir une ancienne version en cache.
+            "asset_version": int(max((BASE_DIR / "static" / f).stat().st_mtime for f in ("app.js", "style.css"))),
             "cesium_ion_token": os.environ.get("CESIUM_ION_TOKEN", ""),
         },
     )
