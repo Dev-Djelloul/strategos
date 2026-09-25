@@ -80,6 +80,8 @@ export function renderMethodology(env: Env): string {
         </tbody>
       </table>
       <p>Les <strong>victimes</strong> ne proviennent que de sources qualifiées : GDELT n'en fournit pas.</p>
+      <h3>Lecture du globe</h3>
+      <p>De loin, les événements sont regroupés en <strong>colonnes hexagonales</strong> (grille H3) : la <strong>hauteur et la couleur</strong> indiquent l'intensité, calculée en pondérant chaque événement par ses victimes déclarées (plafonnées à 50) ; un événement « presse seule » compte moitié. En zoomant, les hexagones laissent place à des <strong>marqueurs lumineux</strong> individuels (taille selon les victimes, anneau vert pour un événement confirmé, halo pulsant pour les 3 derniers jours). Le panneau « Dans la vue » résume les événements de la zone visible.</p>
       <h3>Couleurs des événements</h3>
       <p class="doc-legend">
         <span><i style="background:#e05a56"></i> Frappes aériennes / tirs à distance</span>
@@ -118,7 +120,7 @@ export function renderMethodology(env: Env): string {
       <ul>
         <li>Les sources ne couvrent pas tout : la presse et les analystes voient surtout ce qui est accessible et médiatisé.</li>
         <li>Les décalages varient de quelques minutes (GDELT) à plusieurs mois (UCDP annuel). Une timeline « jusqu'à aujourd'hui » ne prétend pas à l'exhaustivité du jour.</li>
-        <li>Les coordonnées sont parfois approximatives (centre d'une ville ou d'une région).</li>
+        <li>Les coordonnées sont parfois approximatives (centre d'une ville ou d'une région). Les événements UCDP dont la localisation est plus large qu'une région (cumuls nationaux, zones maritimes) <strong>ne sont pas cartographiés</strong> : leur nombre est indiqué dans le panneau des sources.</li>
       </ul>
     </section>
 

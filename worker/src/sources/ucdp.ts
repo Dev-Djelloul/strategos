@@ -18,6 +18,14 @@ const MAX_VERSIONS = 3;
 const EVENTS_TTL_SECONDS = 6 * 3600;
 const VERSIONS_TTL_SECONDS = 24 * 3600;
 
+// where_prec (précision du lieu) : 1 exact, 2 <= ~25 km, 3 district, 4 région,
+// 5-7 pays / zone large / inconnu. Au-delà de 4, poser un point sur la carte
+// serait trompeur (ex. cumul mensuel « Ukraine » localisé au centre du pays).
+const MAX_MAPPABLE_PRECISION = 4;
+const PRECISION_LABELS: Record<number, string> = {
+  1: "exacte", 2: "à ~25 km près", 3: "district", 4: "région (approximatif)",
+};
+
 // type_of_violence : 1 = conflit étatique, 2 = non étatique, 3 = violence unilatérale
 const VIOLENCE_TO_TYPE: Record<number, string> = { 1: "offensive", 2: "offensive", 3: "casualties" };
 const NAME_TO_CODE = Object.fromEntries(Object.entries(COUNTRIES).map(([code, name]) => [name, code]));
@@ -30,6 +38,8 @@ interface UcdpRow {
   where_coordinates?: string;
   country?: string;
   best?: number;
+  where_prec?: number;
+  date_start?: string;
   date_end?: string;
   side_a?: string;
   side_b?: string;
@@ -69,6 +79,7 @@ async function fetchWindow(env: Env, ctx: Ctx, days: number): Promise<FeatureCol
   const seen = new Set<number>();
   const features: Feature[] = [];
   let latestSeen = ""; // dernière date de la version, même hors de la fenêtre demandée
+  const unlocated = { count: 0, fatalities: 0 }; // événements sans localisation précise, non cartographiés
 
   for (const version of versions) {
     for (let page = 0; page < MAX_PAGES; page++) {
@@ -89,11 +100,19 @@ async function fetchWindow(env: Env, ctx: Ctx, days: number): Promise<FeatureCol
         const day = (r.date_end ?? "").slice(0, 10);
         if (day > latestSeen) latestSeen = day;
         if (day && (day < iso(start) || day > iso(end))) continue;
+        if ((r.where_prec ?? 1) > MAX_MAPPABLE_PRECISION) {
+          unlocated.count++;
+          unlocated.fatalities += r.best ?? 0;
+          continue;
+        }
+        const startDay = (r.date_start ?? "").slice(0, 10);
         features.push({
           type: "Feature",
           geometry: { type: "Point", coordinates: [lon, lat] },
           properties: {
             name: `${r.where_coordinates ?? "?"}, ${r.country ?? "?"}`,
+            precision: PRECISION_LABELS[r.where_prec ?? 1] ?? null,
+            date_start: startDay && startDay !== day ? startDay : null,
             event_type: VIOLENCE_TO_TYPE[r.type_of_violence ?? 1] ?? "offensive",
             fatalities: r.best ?? null,
             event_date: (r.date_end ?? "").slice(0, 10) || null,
@@ -106,7 +125,7 @@ async function fetchWindow(env: Env, ctx: Ctx, days: number): Promise<FeatureCol
       if (page + 1 >= (payload.TotalPages ?? 1)) break;
     }
   }
-  return { type: "FeatureCollection", features, versions, latest_date: latestSeen || null };
+  return { type: "FeatureCollection", features, versions, latest_date: latestSeen || null, unlocated };
 }
 
 export async function fetchUcdpEvents(
@@ -122,7 +141,7 @@ export async function fetchUcdpEvents(
   }
   // Fenêtres regroupées (7/30/90 j) pour mutualiser le cache entre requêtes.
   const bucket = opts.days <= 7 ? 7 : opts.days <= 30 ? 30 : 90;
-  const all = await cachedFetch(env, ctx, `ucdp_events_v3_${bucket}`, EVENTS_TTL_SECONDS, () => fetchWindow(env, ctx, bucket), 25000);
+  const all = await cachedFetch(env, ctx, `ucdp_events_v4_${bucket}`, EVENTS_TTL_SECONDS, () => fetchWindow(env, ctx, bucket), 25000);
 
   const cutoff = iso(new Date(Date.now() - opts.days * 86400000));
   const countryName = opts.country ? COUNTRIES[opts.country] : null;
@@ -137,6 +156,6 @@ export async function fetchUcdpEvents(
     type: "FeatureCollection",
     features,
     // Dernière date disponible dans la version candidate (décalage de publication).
-    meta: { latest_date: all.latest_date ?? null, versions: all.versions, stale: all.stale ?? false },
+    meta: { latest_date: all.latest_date ?? null, versions: all.versions, stale: all.stale ?? false, unlocated: all.unlocated ?? null },
   };
 }

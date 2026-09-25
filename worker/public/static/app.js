@@ -1,42 +1,45 @@
-// Tout le script est enveloppé dans une IIFE async : le chargement du
-// terrain (Cesium.CesiumTerrainProvider.fromIonAssetId) est asynchrone,
-// et top-level await n'est pas disponible dans un <script> classique.
+// Strategos — globe des conflits (CesiumJS + H3).
+//
+// Rendu des événements : à l'échelle du monde/d'une région, des colonnes
+// hexagonales 3D (grille H3) dont la hauteur et la couleur suivent
+// l'intensité (événements pondérés par les victimes) ; en zoomant, des
+// marqueurs lumineux individuels. Le contrôle territorial (Ukraine) est
+// dessiné en hexagones posés au sol ; les autres couches en icônes regroupées.
 (async () => {
 
-// Terrain : sans token Cesium Ion, le globe reste plat (ellipsoïde). Avec
-// un token (gratuit, ion.cesium.com), on charge le vrai relief mondial
-// (Cesium World Terrain). L'imagerie (satellite Esri + calques) reste
-// systématiquement gratuite et sans clé, quel que soit le cas.
+// ───────────────────────── Globe ─────────────────────────
 const ionToken = window.CESIUM_ION_TOKEN || "";
 Cesium.Ion.defaultAccessToken = ionToken || undefined;
 
-const satelliteImagery = new Cesium.UrlTemplateImageryProvider({
-  url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-  credit: "Esri, Maxar, Earthstar Geographics",
-  maximumLevel: 19,
-});
+const satelliteLayer = new Cesium.ImageryLayer(
+  new Cesium.UrlTemplateImageryProvider({
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    credit: "Esri, Maxar, Earthstar Geographics",
+    maximumLevel: 19,
+  }),
+  // Fond volontairement assombri : les données ressortent davantage.
+  { brightness: 0.72, contrast: 1.12, saturation: 0.78 }
+);
 
 const terrainProvider = ionToken
-  ? await Cesium.CesiumTerrainProvider.fromIonAssetId(1, { requestVertexNormals: true }) // 1 = Cesium World Terrain
+  ? await Cesium.CesiumTerrainProvider.fromIonAssetId(1, { requestVertexNormals: true })
   : new Cesium.EllipsoidTerrainProvider();
 
 const viewer = new Cesium.Viewer("cesiumContainer", {
   baseLayerPicker: false,
-  geocoder: Boolean(ionToken), // recherche de lieux (géocodeur Cesium Ion)
+  geocoder: Boolean(ionToken),
   homeButton: true,
   sceneModePicker: true,
   navigationHelpButton: false,
   animation: false,
   timeline: false,
   fullscreenButton: false,
-  infoBox: false, // remplacé par le panneau latéral (#side-panel)
-  selectionIndicator: true,
-  baseLayer: new Cesium.ImageryLayer(satelliteImagery),
+  infoBox: false,
+  selectionIndicator: false,
+  baseLayer: satelliteLayer,
   terrainProvider,
 });
 
-// Couche de référence superposée : frontières, noms de pays, villes -
-// gratuite et sans clé également.
 viewer.imageryLayers.addImageryProvider(
   new Cesium.UrlTemplateImageryProvider({
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
@@ -44,9 +47,6 @@ viewer.imageryLayers.addImageryProvider(
     maximumLevel: 19,
   })
 );
-
-// Couche routes/rail/transport - plus de détail au fur et à mesure du
-// zoom (visible surtout en vue rapprochée sur une ville/région).
 viewer.imageryLayers.addImageryProvider(
   new Cesium.UrlTemplateImageryProvider({
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
@@ -55,266 +55,51 @@ viewer.imageryLayers.addImageryProvider(
   })
 );
 
-viewer.scene.globe.enableLighting = true;
+const scene = viewer.scene;
+scene.globe.baseColor = Cesium.Color.fromCssColorString("#0b1424");
+scene.globe.enableLighting = false; // activable via « Jour / nuit en temps réel »
+scene.globe.showGroundAtmosphere = true;
+scene.highDynamicRange = false;
+scene.backgroundColor = Cesium.Color.fromCssColorString("#05070b");
+scene.fog.density = 0.00018;
 if (ionToken) {
-  viewer.scene.globe.depthTestAgainstTerrain = true;
-  // Le relief réel est quasi invisible à l'échelle du globe : on
-  // l'accentue légèrement pour qu'il se voie sans être déformé.
-  viewer.scene.verticalExaggeration = 1.5;
+  scene.globe.depthTestAgainstTerrain = true;
+  scene.verticalExaggeration = 1.5; // relief quasi invisible sinon
 }
 
-// Horloge synchronisée sur l'heure système réelle, qui avance en continu
-// (au lieu de rester figée sur l'instant du chargement de la page) : le
-// terminateur jour/nuit sur le globe suit ainsi le soleil en temps réel.
 viewer.clock.shouldAnimate = true;
 viewer.clock.clockStep = Cesium.ClockStep.SYSTEM_CLOCK;
-viewer.clock.multiplier = 1;
 
-viewer.camera.flyHome(0);
-
-// Navigation "Google Earth" : régions stratégiques pré-cadrées avec une
-// vue inclinée (perspective 3D plutôt que vue à la verticale). Le moteur
-// de recherche de lieux (loupe en haut à droite du globe) complète.
-const REGIONS = [
-  { name: "Ukraine", bbox: [22, 44, 41, 53], lon: 31.5, lat: 48.5, range: 1100000 },
-  { name: "Gaza / Israël / Liban", bbox: [33.5, 29, 37, 34.7], lon: 35.0, lat: 32.0, range: 350000 },
-  { name: "Syrie", bbox: [35.5, 32, 42.5, 37.5], lon: 38.0, lat: 35.0, range: 700000 },
-  { name: "Soudan", bbox: [21.5, 8.5, 39, 23], lon: 30.0, lat: 15.5, range: 1500000 },
-  { name: "Yémen / mer Rouge", bbox: [41, 11, 54, 19], lon: 44.0, lat: 15.0, range: 1200000 },
-  { name: "Sahel (Mali)", bbox: [-13, 10, 5, 25], lon: -2.0, lat: 15.0, range: 1500000 },
-  { name: "Afghanistan", bbox: [60.5, 29, 75, 38.5], lon: 66.0, lat: 34.0, range: 1200000 },
-  { name: "Iran / Golfe", bbox: [44, 24, 63.5, 40], lon: 53.0, lat: 30.5, range: 1800000 },
-  { name: "Taïwan / mer de Chine", bbox: [117, 20, 124, 27], lon: 121.0, lat: 24.0, range: 1000000 },
-  { name: "Corée", bbox: [124, 33, 131.5, 43], lon: 127.5, lat: 37.5, range: 900000 },
-  { name: "Monde", lon: 10.0, lat: 20.0, range: 22000000, pitch: -90 },
-];
-
-const regionEl = document.getElementById("region");
-REGIONS.forEach((r, i) => {
-  const opt = document.createElement("option");
-  opt.value = String(i);
-  opt.textContent = r.name;
-  regionEl.appendChild(opt);
+// Vue d'ouverture : Europe / Moyen-Orient, légèrement inclinée.
+// Écran en portrait (mobile) : on recule pour que le globe tienne dans la largeur.
+const HOME = { lon: 32, lat: 33, height: innerHeight > innerWidth ? 26000000 : 14500000, pitch: -75 };
+viewer.camera.setView({
+  destination: Cesium.Cartesian3.fromDegrees(HOME.lon, HOME.lat, HOME.height),
+  orientation: { heading: 0, pitch: Cesium.Math.toRadians(HOME.pitch), roll: 0 },
 });
-// Cadre la caméra sur un rectangle [ouest, sud, est, nord] en vue inclinée :
-// la distance est déduite de la taille réelle du cadre.
-function frameBBox([w, s, e, n]) {
-  const center = Cesium.Cartesian3.fromDegrees((w + e) / 2, (s + n) / 2, 0);
-  const corner = Cesium.Cartesian3.fromDegrees(e, n, 0);
-  const radius = Cesium.Cartesian3.distance(center, corner);
-  // Pays très étendu (ex : Russie) : vue plongeante et distance plafonnée,
-  // une vue inclinée à plusieurs milliers de km fait échouer le rendu.
-  const wide = radius > 2500000;
-  viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(center, wide ? 2500000 : radius), {
-    duration: 2.5,
-    offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(wide ? -90 : -50), wide ? 12000000 : radius * 2.4),
+viewer.homeButton.viewModel.command.beforeExecute.addEventListener((e) => {
+  e.cancel = true;
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(HOME.lon, HOME.lat, HOME.height),
+    orientation: { heading: 0, pitch: Cesium.Math.toRadians(HOME.pitch), roll: 0 },
+    duration: 2,
   });
-}
-
-regionEl.addEventListener("change", () => {
-  const r = REGIONS[Number(regionEl.value)];
-  if (!r) return;
-  countryEl.value = ""; // le cadre de la région remplace celui du pays
-  setZone(r.bbox || null); // "Monde" : pas de cadre
-  viewer.camera.flyToBoundingSphere(
-    new Cesium.BoundingSphere(Cesium.Cartesian3.fromDegrees(r.lon, r.lat, 0), r.range / 4),
-    {
-      duration: 2.5,
-      offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(r.pitch ?? -40), r.range),
-    }
-  );
 });
 
-// Villes 3D photoréalistes (maillage Google via Cesium Ion) : chargé à la
-// demande car lourd. Il remplace le globe (imagerie + relief) tant qu'il
-// est actif ; on restaure le globe classique en le décochant.
-let photo3dTileset = null;
-const photo3dToggleEl = document.getElementById("photo3d-toggle");
-if (!ionToken) {
-  photo3dToggleEl.disabled = true;
-  photo3dToggleEl.parentElement.title = "Nécessite un token Cesium Ion (CESIUM_ION_TOKEN)";
-}
-photo3dToggleEl.addEventListener("change", async () => {
-  try {
-    if (photo3dToggleEl.checked) {
-      if (!photo3dTileset) {
-        photo3dTileset = await Cesium.createGooglePhotorealistic3DTileset();
-        viewer.scene.primitives.add(photo3dTileset);
-      }
-      photo3dTileset.show = true;
-      viewer.scene.globe.show = false;
-    } else {
-      if (photo3dTileset) photo3dTileset.show = false;
-      viewer.scene.globe.show = true;
-    }
-  } catch (err) {
-    photo3dToggleEl.checked = false;
-    viewer.scene.globe.show = true;
-    statusEl.textContent = `⚠️ Villes 3D indisponibles — ${err.message || err}`;
-  }
-});
+// Le clic est géré par nos soins (panneau latéral) : on retire les actions
+// par défaut (sélection d'entité, suivi au double-clic).
+viewer.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
+viewer.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 
-// La barre d'outils se replie/déplie avec une transition CSS ; Cesium ne
-// redétecte pas automatiquement le changement de taille de son conteneur
-// dans ce cas (pas d'événement resize navigateur), d'où cet observer.
-new ResizeObserver(() => viewer.resize()).observe(document.getElementById("cesiumContainer"));
-
-// Chaque couche de données vit dans son propre DataSource : on peut la
-// rafraîchir, la vider ou l'afficher/masquer indépendamment des autres
-// (ex: actualiser les conflits sans effacer les sites nucléaires).
-// Les trois sources de conflits (ACLED qualifiée, UCDP académique, GDELT
-// presse non vérifiée) sont fusionnées côté serveur : un événement rapporté
-// par plusieurs sources devient un seul marqueur avec un niveau de fiabilité.
-const EVENT_SOURCES = [
-  { key: "acled", toggleId: "acled-toggle", badgeId: "acled-badge" },
-  { key: "ucdp", toggleId: "ucdp-toggle", badgeId: "ucdp-badge" },
-  { key: "gdelt", toggleId: "gdelt-toggle", badgeId: "gdelt-badge" },
-];
-const conflictsLayer = new Cesium.CustomDataSource("conflicts");
-const nuclearLayer = new Cesium.CustomDataSource("nuclear");
-const militaryLayer = new Cesium.CustomDataSource("military");
-const infrastructureLayer = new Cesium.CustomDataSource("infrastructure");
-const controlLayer = new Cesium.CustomDataSource("control");
-viewer.dataSources.add(conflictsLayer);
-viewer.dataSources.add(nuclearLayer);
-viewer.dataSources.add(militaryLayer);
-viewer.dataSources.add(infrastructureLayer);
-viewer.dataSources.add(controlLayer);
-
-const statusEl = document.getElementById("status");
-const daysEl = document.getElementById("days");
-const countryEl = document.getElementById("country");
-const eventTypeEl = document.getElementById("event-type");
-const refreshBtn = document.getElementById("refresh");
-const nuclearToggleEl = document.getElementById("nuclear-toggle");
-const militaryToggleEl = document.getElementById("military-toggle");
-const infrastructureToggleEl = document.getElementById("infrastructure-toggle");
-const toolbarEl = document.getElementById("toolbar");
-const toolbarToggleBtn = document.getElementById("toolbar-toggle");
-
-const EVENT_TYPE_LABELS = {
-  all: "Tous",
-  airstrike: "Frappes aériennes / tirs à distance",
-  offensive: "Batailles / offensives",
-  protest: "Manifestations",
-  casualties: "Violence contre civils",
-  ceasefire: "Développements stratégiques",
+// ───────────────────────── Utilitaires ─────────────────────────
+const $ = (id) => document.getElementById(id);
+const escapeHtml = (s) => {
+  const d = document.createElement("div");
+  d.textContent = s ?? "";
+  return d.innerHTML;
 };
-
-const EVENT_COLORS = {
-  airstrike: Cesium.Color.fromCssColorString("#e05a56"),
-  offensive: Cesium.Color.fromCssColorString("#c9302c"),
-  protest: Cesium.Color.fromCssColorString("#e0a13c"),
-  casualties: Cesium.Color.fromCssColorString("#8b1a1a"),
-  ceasefire: Cesium.Color.fromCssColorString("#4caf7d"),
-};
-
-// Les points ne sont plus dessinés à travers la planète (les événements de
-// l'autre face du globe apparaissaient par-dessus la vue). Le test de
-// profondeur n'est désactivé qu'à faible distance de la caméra, pour éviter
-// qu'un point posé au sol soit avalé par le relief lors d'un zoom serré.
-const POINT_DEPTH_DISTANCE = 30000;
-
-const NUCLEAR_COLOR = Cesium.Color.fromCssColorString("#f4d03f");
-const MILITARY_COLOR = Cesium.Color.fromCssColorString("#5b8def");
-const INFRASTRUCTURE_COLOR = Cesium.Color.fromCssColorString("#7ed6c1");
-
-function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = str ?? "";
-  return div.innerHTML;
-}
-
-// Pastille à côté de chaque couche : nombre d'éléments réels et
-// heure de mise à jour, ou "indisponible" avec la cause au survol. Aucune
-// donnée fabriquée n'est jamais affichée.
-function setLayerBadge(badgeId, { count, source, error, fetchedAt, stale, staleReason, loading } = {}) {
-  const el = document.getElementById(badgeId);
-  if (!el) return;
-  el.classList.remove("badge-live", "badge-demo");
-  if (loading) {
-    el.textContent = "chargement…";
-    el.title = "Première récupération d'une source lente, en cours côté serveur";
-  } else if (error) {
-    el.textContent = "indisponible";
-    el.title = error;
-    el.classList.add("badge-demo");
-  } else if (source) {
-    const when = fetchedAt ? new Date(fetchedAt) : new Date();
-    if (stale) {
-      // Source injoignable : dernière donnée RÉELLE en cache, horodatée.
-      el.textContent = `${count} · du ${when.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })} ${when.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
-      el.title = `Source injoignable (${staleReason || "erreur"}) — dernière donnée réelle en cache, récupérée le ${when.toLocaleString("fr-FR")}`;
-      el.classList.add("badge-demo");
-    } else {
-      el.textContent = `${count}`;
-      el.title = `Source : ${source} — données du ${when.toLocaleString("fr-FR")}`;
-      el.classList.add("badge-live");
-    }
-  } else {
-    el.textContent = "";
-    el.title = "";
-  }
-  el.style.display = el.textContent ? "" : "none";
-}
-
-// Panneau latéral : détail de l'élément sélectionné sur le globe. Chaque
-// entité enregistre ses infos ici (clé = entité), lues à la sélection.
-const panelInfo = new WeakMap();
-const RELIABILITY = {
-  verified: { label: "Source qualifiée", cls: "rel-verified" },
-  press: { label: "Presse — non vérifié", cls: "rel-press" },
-  community: { label: "Base collaborative", cls: "rel-community" },
-  modeled: { label: "Estimation agrégée", cls: "rel-community" },
-};
-const sidePanelEl = document.getElementById("side-panel");
-const sidePanelBody = document.getElementById("side-panel-body");
-
-function showSidePanel(info) {
-  const rel = info.badge || RELIABILITY[info.reliability] || RELIABILITY.community;
-  const rows = (info.rows || [])
-    .filter(([, v]) => v !== undefined && v !== null && v !== "")
-    .map(([k, v]) => `<div class="sp-row"><dt>${escapeHtml(k)}</dt><dd>${escapeHtml(String(v))}</dd></div>`)
-    .join("");
-  const link = /^https?:\/\//.test(info.url || "")
-    ? `<a class="sp-link" href="${escapeHtml(info.url)}" target="_blank" rel="noopener noreferrer">Ouvrir la source ↗</a>`
-    : "";
-  const sources = (info.sources || []).map((x) => {
-    const r = RELIABILITY[x.reliability] || RELIABILITY.community;
-    const href = /^https?:\/\//.test(x.url || "") ? ` <a href="${escapeHtml(x.url)}" target="_blank" rel="noopener noreferrer">article ↗</a>` : "";
-    const detail = [x.date, x.count ? `${x.count} mentions` : null].filter(Boolean).join(" · ");
-    return `<li><span class="sp-rel ${r.cls}">${escapeHtml(x.label)}</span> <span class="sp-src-detail">${escapeHtml(detail)}</span>${href}${x.notes && x.reliability === "verified" ? `<div class="sp-src-notes">${escapeHtml(x.notes)}</div>` : ""}</li>`;
-  }).join("");
-  sidePanelBody.innerHTML = `
-    <div class="sp-kind">${escapeHtml(info.kind || "")}</div>
-    <h2 class="sp-title">${escapeHtml(info.title || "Sans nom")}</h2>
-    <div class="sp-source"><span class="sp-rel ${rel.cls}">${rel.label}</span> <span>${escapeHtml(info.sourceLabel || "")}</span></div>
-    <dl class="sp-rows">${rows}</dl>
-    ${sources ? `<h3 class="sp-h3">Sources (${info.sources.length})</h3><ul class="sp-sources">${sources}</ul>` : ""}
-    ${info.notes ? `<p class="sp-notes">${escapeHtml(info.notes)}</p>` : ""}
-    ${link}
-    <button class="btn-primary sp-zoom" id="sp-zoom">Zoomer sur le lieu</button>`;
-  document.getElementById("sp-zoom").addEventListener("click", () => {
-    viewer.camera.flyToBoundingSphere(
-      new Cesium.BoundingSphere(Cesium.Cartesian3.fromDegrees(info.lon, info.lat, 0), 3000),
-      { duration: 2, offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-40), 25000) }
-    );
-  });
-  sidePanelEl.classList.add("open");
-}
-
-function hideSidePanel() {
-  sidePanelEl.classList.remove("open");
-}
-
-document.getElementById("side-panel-close").addEventListener("click", () => {
-  viewer.selectedEntity = undefined;
-});
-viewer.selectedEntityChanged.addEventListener((entity) => {
-  const info = entity && panelInfo.get(entity);
-  if (info) showSidePanel(info);
-  else hideSidePanel();
-});
+const frDate = (iso) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : "");
+const isUrl = (u) => /^https?:\/\//.test(u || "");
 
 async function apiJson(url) {
   const res = await fetch(url);
@@ -325,505 +110,828 @@ async function apiJson(url) {
   return res.json();
 }
 
-const countryBounds = {};
+/** Ligne d'état sous chaque source/couche : nombre, fraîcheur ou cause de l'échec. */
+function setStatus(prefix, { text, kind = "" } = {}) {
+  const el = $(`${prefix}-status`);
+  if (!el) return;
+  el.textContent = text || "";
+  el.className = `status ${kind}`;
+}
 
-async function loadFilters() {
-  try {
-    const res = await fetch("/api/filters");
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const filters = await res.json();
-
-    filters.countries.forEach(({ code, name, bbox }) => {
-      if (bbox) countryBounds[code] = bbox;
-      const opt = document.createElement("option");
-      opt.value = code;
-      opt.textContent = name;
-      countryEl.appendChild(opt);
-    });
-
-    filters.event_types.forEach((type) => {
-      if (type === "all") return;
-      const opt = document.createElement("option");
-      opt.value = type;
-      opt.textContent = EVENT_TYPE_LABELS[type] || type;
-      eventTypeEl.appendChild(opt);
-    });
-  } catch (err) {
-    statusEl.textContent = `Filtres indisponibles (${err.message})`;
+function layerStatus(prefix, { count, error, fetchedAt, stale, staleReason, loading, note } = {}) {
+  const el = $(`${prefix}-status`);
+  if (el) el.title = "";
+  if (loading) return setStatus(prefix, { text: "première récupération en cours…", kind: "loading" });
+  if (error) {
+    if (el) el.title = error;
+    return setStatus(prefix, { text: "indisponible", kind: "warn" });
   }
-}
-
-// Timeline : les événements chargés sont conservés en mémoire, et le
-// curseur ne fait que régler la date maximale affichée (pas de nouvel
-// appel réseau à chaque déplacement).
-const timelineEl = document.getElementById("timeline");
-const timelineSlider = document.getElementById("timeline-slider");
-const timelineLabel = document.getElementById("timeline-label");
-const timelinePlayBtn = document.getElementById("timeline-play");
-let timelineStart = null; // Date (UTC) correspondant à la position 0
-let timelineTimer = null;
-
-function stopTimelinePlayback() {
-  clearInterval(timelineTimer);
-  timelineTimer = null;
-  timelinePlayBtn.textContent = "▶";
-}
-
-function timelineCutoff() {
-  const day = new Date(timelineStart.getTime() + Number(timelineSlider.value) * 86400000);
-  return day.toISOString().substring(0, 10);
-}
-
-function applyTimeline() {
-  const cutoff = timelineStart ? timelineCutoff() : null;
-  if (cutoff) timelineLabel.textContent = `jusqu'au ${cutoff}`;
-  conflictsLayer.entities.values.forEach((entity) => {
-    const date = entity.properties?.event_date?.getValue();
-    const conf = entity.properties?.confidence?.getValue();
-    entity.show = (!cutoff || !date || date <= cutoff) && (showPressOnly || conf !== "press") && entityInZone(entity);
-  });
-}
-
-function setupTimeline(days) {
-  stopTimelinePlayback();
-  const hasDated = conflictsLayer.entities.values.some((e) => e.properties?.event_date?.getValue());
-  if (!hasDated) {
-    timelineStart = null;
-    timelineEl.hidden = true;
-    applyTimeline();
-    return;
+  if (count === undefined) return setStatus(prefix, {});
+  const when = fetchedAt ? new Date(fetchedAt) : new Date();
+  if (stale) {
+    if (el) el.title = `Source injoignable (${staleReason || "erreur"}) — dernière donnée réelle en cache`;
+    const d = when.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+    const t = when.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    return setStatus(prefix, { text: `${count} · donnée du ${d} ${t} (source injoignable)`, kind: "warn" });
   }
-  const end = new Date();
-  end.setUTCHours(0, 0, 0, 0);
-  timelineStart = new Date(end.getTime() - Number(days) * 86400000);
-  timelineSlider.max = String(days);
-  timelineSlider.value = String(days);
-  timelineEl.hidden = false;
-  applyTimeline();
+  setStatus(prefix, { text: note ? `${count} · ${note}` : `${count}`, kind: "ok" });
 }
 
-timelineSlider.addEventListener("input", () => {
-  stopTimelinePlayback();
-  applyTimeline();
-});
-
-timelinePlayBtn.addEventListener("click", () => {
-  if (timelineTimer) return stopTimelinePlayback();
-  if (Number(timelineSlider.value) >= Number(timelineSlider.max)) timelineSlider.value = "0";
-  timelinePlayBtn.textContent = "⏸";
-  timelineTimer = setInterval(() => {
-    if (Number(timelineSlider.value) >= Number(timelineSlider.max)) return stopTimelinePlayback();
-    timelineSlider.value = String(Number(timelineSlider.value) + 1);
-    applyTimeline();
-  }, 400);
-});
-
-const CONFIDENCE_STYLE = {
-  confirmed: { pixelSize: 13, alpha: 1, outline: Cesium.Color.fromCssColorString("#4caf7d"), outlineWidth: 3 },
-  verified: { pixelSize: 10, alpha: 1, outline: Cesium.Color.WHITE, outlineWidth: 1 },
-  press: { pixelSize: 7, alpha: 0.55, outline: Cesium.Color.WHITE, outlineWidth: 0 },
+// ───────────────────────── Panneau de détail ─────────────────────────
+const RELIABILITY = {
+  verified: { label: "Source qualifiée", cls: "rel-verified" },
+  press: { label: "Presse — non vérifié", cls: "rel-press" },
+  community: { label: "Base collaborative", cls: "rel-community" },
+  modeled: { label: "Estimation agrégée", cls: "rel-community" },
 };
 const CONFIDENCE_LABELS = {
   confirmed: { label: "Confirmé — plusieurs sources dont une qualifiée", cls: "rel-verified" },
   verified: { label: "Source qualifiée", cls: "rel-verified" },
   press: { label: "Presse — non vérifié", cls: "rel-press" },
 };
-let showPressOnly = true;
+const sidePanelEl = $("side-panel");
 
-// Bannière d'état : dit clairement, à l'ouverture, ce qui alimente le
-// globe et ce qui manque (surtout l'absence de source qualifiée).
-const SOURCE_NAMES = { acled: "ACLED", ucdp: "UCDP", gdelt: "GDELT" };
-const QUALIFIED = ["acled", "ucdp"];
-const bannerEl = document.getElementById("source-banner");
+function showSidePanel(info) {
+  const rel = info.badge || RELIABILITY[info.reliability] || RELIABILITY.community;
+  const rows = (info.rows || [])
+    .filter(([, v]) => v !== undefined && v !== null && v !== "")
+    .map(([k, v]) => `<div class="sp-row"><dt>${escapeHtml(k)}</dt><dd>${escapeHtml(String(v))}</dd></div>`)
+    .join("");
+  const sources = (info.sources || []).map((x) => {
+    const r = RELIABILITY[x.reliability] || RELIABILITY.community;
+    const href = isUrl(x.url) ? ` <a href="${escapeHtml(x.url)}" target="_blank" rel="noopener noreferrer">article ↗</a>` : "";
+    const detail = [x.date, x.count ? `${x.count} mentions` : null].filter(Boolean).join(" · ");
+    const notes = x.notes && x.reliability === "verified" ? `<div class="sp-src-notes">${escapeHtml(x.notes)}</div>` : "";
+    return `<li><span class="sp-rel ${r.cls}">${escapeHtml(x.label)}</span> <span class="sp-src-detail">${escapeHtml(detail)}</span>${href}${notes}</li>`;
+  }).join("");
+  const items = (info.items || []).map((it) => `
+    <li><div class="sp-item-title">${escapeHtml(it.title)}</div>
+      <div class="sp-item-meta">${escapeHtml(it.meta || "")}${isUrl(it.url) ? ` · <a href="${escapeHtml(it.url)}" target="_blank" rel="noopener noreferrer">source ↗</a>` : ""}</div></li>`).join("");
 
-function renderSourceBanner(sources, selected, fatalError) {
-  const pill = (key, ok, text, err) =>
-    `<span class="sb-pill ${ok ? "sb-ok" : "sb-ko"}" title="${escapeHtml(err || "")}">${ok ? "●" : "○"} ${SOURCE_NAMES[key]} — ${escapeHtml(text)}</span>`;
-  let pills = "";
-  let qualifiedOk = false;
-  if (fatalError) {
-    pills = `<span class="sb-pill sb-ko">○ Serveur — ${escapeHtml(fatalError)}</span>`;
-  } else {
-    pills = selected.map((s) => {
-      const st = sources?.[s.key];
-      if (st?.ok) {
-        if (QUALIFIED.includes(s.key)) qualifiedOk = true;
-        const upTo = st.meta?.latest_date
-          ? ` · données jusqu'au ${new Date(st.meta.latest_date).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}`
-          : "";
-        return pill(s.key, true, `${st.count} événement(s)${upTo}`);
-      }
-      return pill(s.key, false, "indisponible", st?.error);
-    }).join("");
-  }
-
-  let message = "";
-  if (!fatalError && selected.length && !qualifiedOk) {
-    message = `<strong>Aucune source qualifiée disponible</strong> (ACLED, UCDP) : seuls des événements détectés dans la presse, <em>non vérifiés</em>, sont affichés.`;
-  }
-  const hasIssue = fatalError || message || (selected.length && selected.some((s) => !sources?.[s.key]?.ok));
-  bannerEl.classList.toggle("sb-warn", Boolean(message || fatalError));
-  bannerEl.innerHTML = `<div class="sb-line">${message ? `<span class="sb-msg">${message}</span>` : ""}<span class="sb-pills">${pills}</span><a href="/methodologie">Pourquoi ? Sources et méthodologie →</a></div>`;
-  bannerEl.hidden = !hasIssue;
-  syncToolbarHeight();
+  $("side-panel-body").innerHTML = `
+    <div class="sp-kind">${escapeHtml(info.kind || "")}</div>
+    <h2 class="sp-title">${escapeHtml(info.title || "Sans nom")}</h2>
+    <div class="sp-source"><span class="sp-rel ${rel.cls}">${rel.label}</span> <span>${escapeHtml(info.sourceLabel || "")}</span></div>
+    <dl class="sp-rows">${rows}</dl>
+    ${items ? `<h3 class="sp-h3">${escapeHtml(info.itemsTitle || "Événements")}</h3><ul class="sp-items">${items}</ul>` : ""}
+    ${sources ? `<h3 class="sp-h3">Sources (${info.sources.length})</h3><ul class="sp-sources">${sources}</ul>` : ""}
+    ${info.notes ? `<p class="sp-notes">${escapeHtml(info.notes)}</p>` : ""}
+    ${isUrl(info.url) ? `<a class="sp-link" href="${escapeHtml(info.url)}" target="_blank" rel="noopener noreferrer">Ouvrir la source ↗</a>` : ""}
+    <button class="btn btn-primary sp-zoom" id="sp-zoom">Zoomer sur le lieu</button>`;
+  $("sp-zoom").addEventListener("click", () => flyToPoint(info.lon, info.lat, info.zoomRange || 30000));
+  sidePanelEl.classList.add("open");
+  document.body.classList.add("sp-open");
 }
 
-async function loadEvents() {
-  statusEl.textContent = "Chargement…";
-  conflictsLayer.entities.removeAll();
-  const days = daysEl.value;
-  const selected = EVENT_SOURCES.filter((s) => document.getElementById(s.toggleId).checked);
-  EVENT_SOURCES.forEach((s) => setLayerBadge(s.badgeId));
-  if (!selected.length) {
-    renderSourceBanner({}, selected);
-    setupTimeline(days);
-    statusEl.textContent = "Aucune source de conflits sélectionnée";
-    return;
-  }
+function hideSidePanel() {
+  sidePanelEl.classList.remove("open");
+  document.body.classList.remove("sp-open");
+}
+$("side-panel-close").addEventListener("click", hideSidePanel);
 
-  const params = new URLSearchParams({ days, event_type: eventTypeEl.value, sources: selected.map((s) => s.key).join(",") });
-  if (countryEl.value) params.set("country", countryEl.value);
-
-  try {
-    const geojson = await apiJson(`/api/conflicts?${params.toString()}`);
-    const features = geojson.features || [];
-
-    features.forEach((feature) => {
-      const [lon, lat] = feature.geometry.coordinates;
-      const props = feature.properties || {};
-      const style = CONFIDENCE_STYLE[props.confidence] || CONFIDENCE_STYLE.verified;
-      const color = (EVENT_COLORS[props.event_type] || Cesium.Color.fromCssColorString("#e05a56")).withAlpha(style.alpha);
-
-      const entity = conflictsLayer.entities.add({
-        position: Cesium.Cartesian3.fromDegrees(lon, lat),
-        point: {
-          pixelSize: style.pixelSize,
-          color,
-          outlineColor: style.outline,
-          outlineWidth: style.outlineWidth,
-          disableDepthTestDistance: POINT_DEPTH_DISTANCE,
-        },
-        name: props.name || "Événement",
-        properties: { event_date: props.event_date || null, confidence: props.confidence },
-      });
-      const conf = CONFIDENCE_LABELS[props.confidence] || CONFIDENCE_LABELS.press;
-      panelInfo.set(entity, {
-        kind: EVENT_TYPE_LABELS[props.event_type] || props.event_type || "Événement",
-        title: props.name || "Événement",
-        badge: conf,
-        sourceLabel: (props.sources || []).map((x) => x.label).filter((v, i, a) => a.indexOf(v) === i).join(" + "),
-        rows: [
-          ["Date", props.event_date],
-          ["Victimes", props.fatalities],
-        ],
-        sources: props.sources,
-        lon,
-        lat,
-      });
-    });
-
-    EVENT_SOURCES.forEach((s) => {
-      const st = geojson.sources?.[s.key];
-      if (!st) return;
-      if (st.ok) setLayerBadge(s.badgeId, { count: st.count, source: s.key });
-      else setLayerBadge(s.badgeId, { error: st.error });
-    });
-    setupTimeline(days);
-    renderSourceBanner(geojson.sources, selected);
-
-    const confirmed = features.filter((f) => f.properties.confidence === "confirmed").length;
-    statusEl.textContent = `${features.length} événement(s) dont ${confirmed} confirmé(s) — mis à jour ${new Date().toLocaleTimeString("fr-FR")}`;
-  } catch (err) {
-    setupTimeline(days);
-    renderSourceBanner(null, selected, err.message);
-    statusEl.textContent = `⚠️ Conflits indisponibles — ${err.message}`;
-  }
+function flyToPoint(lon, lat, range) {
+  viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(Cesium.Cartesian3.fromDegrees(lon, lat, 0), range / 8), {
+    duration: 2,
+    offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-45), range),
+  });
 }
 
-// Couche générique pour les points simples (nucléaire, militaire,
-// infrastructures) : même structure GeoJSON, seul le style et
-// l'endpoint changent.
-async function loadSimpleLayer({ dataSource, toggleEl, endpoint, color, icon, emptyLabel, badgeId, kindLabel, sourceLabel, retry = 0 }) {
-  dataSource.entities.removeAll();
-  if (!toggleEl?.checked) {
-    setLayerBadge(badgeId);
-    return;
-  }
+// Clic : entité (marqueur, icône) ou primitive (hexagone) portant `.panel`.
+const clickHandler = new Cesium.ScreenSpaceEventHandler(scene.canvas);
+clickHandler.setInputAction((click) => {
+  const picked = scene.pick(click.position);
+  if (!Cesium.defined(picked)) return hideSidePanel();
+  const id = picked.id;
+  const info = id instanceof Cesium.Entity ? panelInfo.get(id) : id?.panel;
+  if (info) showSidePanel(info);
+  else hideSidePanel();
+}, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
-  try {
-    const geojson = await apiJson(endpoint);
+// ───────────────────────── État ─────────────────────────
+const EVENT_SOURCES = ["acled", "ucdp", "gdelt"];
+const state = {
+  days: 30,
+  events: [], // features fusionnées renvoyées par /api/conflicts
+  press: true, // afficher les événements « presse seule »
+  viewMode: "auto",
+  cutoff: null, // date max affichée (timeline), YYYY-MM-DD
+};
+const panelInfo = new WeakMap();
 
-    (geojson.features || []).forEach((feature) => {
-      const [lon, lat] = feature.geometry.coordinates;
-      const props = feature.properties || {};
-      const name = props.name || emptyLabel;
-
-      const entity = dataSource.entities.add({
-        position: Cesium.Cartesian3.fromDegrees(lon, lat),
-        point: {
-          pixelSize: 10,
-          color,
-          outlineColor: Cesium.Color.BLACK,
-          outlineWidth: 2,
-          disableDepthTestDistance: POINT_DEPTH_DISTANCE,
-        },
-        name: `${icon} ${name}`,
-      });
-      panelInfo.set(entity, {
-        kind: `${icon} ${kindLabel}`,
-        title: name,
-        sourceLabel,
-        reliability: "community",
-        rows: [
-          ["Pays", props.country],
-          ["Statut", props.status],
-          ["Type", props.type],
-          ["Opérateur", props.operator],
-        ],
-        lon,
-        lat,
-      });
-    });
-
-    applyZone();
-    setLayerBadge(badgeId, { count: (geojson.features || []).length, source: geojson.source, fetchedAt: geojson.fetched_at, stale: geojson.stale, staleReason: geojson.stale_reason });
-  } catch (err) {
-    if (err.message.includes("en cours") && retry < 12) {
-      // Source lente en premier chargement : le serveur la prépare en
-      // arrière-plan, on réessaie sans bloquer l'interface.
-      setLayerBadge(badgeId, { loading: true });
-      setTimeout(() => loadSimpleLayer({ dataSource, toggleEl, endpoint, color, icon, emptyLabel, badgeId, kindLabel, sourceLabel, retry: retry + 1 }), 15000);
-      return;
-    }
-    console.error(`Erreur chargement couche ${endpoint}:`, err);
-    setLayerBadge(badgeId, { error: err.message });
-  }
-}
-
-const loadNuclearSites = () => loadSimpleLayer({
-  dataSource: nuclearLayer, toggleEl: nuclearToggleEl, endpoint: "/api/nuclear-sites",
-  color: NUCLEAR_COLOR, icon: "☢️", emptyLabel: "Site nucléaire", badgeId: "nuclear-badge", kindLabel: "Installation nucléaire civile", sourceLabel: "Wikidata",
-});
-const loadMilitarySites = () => loadSimpleLayer({
-  dataSource: militaryLayer, toggleEl: militaryToggleEl, endpoint: "/api/military-sites",
-  color: MILITARY_COLOR, icon: "🎖️", emptyLabel: "Site militaire", badgeId: "military-badge", kindLabel: "Site militaire", sourceLabel: "OpenStreetMap",
-});
-const loadInfrastructureSites = () => loadSimpleLayer({
-  dataSource: infrastructureLayer, toggleEl: infrastructureToggleEl, endpoint: "/api/infrastructure-sites",
-  color: INFRASTRUCTURE_COLOR, icon: "🛫", emptyLabel: "Infrastructure", badgeId: "infrastructure-badge", kindLabel: "Infrastructure", sourceLabel: "OpenStreetMap",
-});
-
-
-// Contrôle territorial (Ukraine) : localités sous contrôle russe/contesté,
-// et changements de main récents, d'après VIINA (ODbL). Fichier statique
-// produit par scripts/build_control.py : c'est un instantané quotidien,
-// une estimation issue d'un vote entre plusieurs sources, pas une ligne
-// de front officielle.
-const controlToggleEl = document.getElementById("control-toggle");
-const CONTROL_STYLE = {
-  R: { color: Cesium.Color.fromCssColorString("#e0413a"), label: "Sous contrôle russe" },
-  C: { color: Cesium.Color.fromCssColorString("#f0a020"), label: "Contesté" },
-  U: { color: Cesium.Color.fromCssColorString("#4c9be8"), label: "Sous contrôle ukrainien (changement récent)" },
+const EVENT_TYPE_LABELS = {
+  airstrike: "Frappes aériennes / tirs à distance",
+  offensive: "Batailles / offensives",
+  protest: "Manifestations",
+  casualties: "Violence contre civils",
+  ceasefire: "Développements stratégiques",
+};
+const EVENT_TYPE_COLORS = {
+  airstrike: "#f0803c", offensive: "#e2463b", casualties: "#c2185b", protest: "#e0a13c", ceasefire: "#4caf7d",
 };
 
-async function loadControl() {
-  controlLayer.entities.removeAll();
-  if (!controlToggleEl.checked) {
-    setLayerBadge("control-badge");
+// ───────────────────────── Événements : hexagones 3D & marqueurs ─────────────────────────
+const RAMP = ["#f6c453", "#f08a3c", "#e2463b", "#a31245"].map((c) => Cesium.Color.fromCssColorString(c));
+function rampColor(t, alpha) {
+  const x = Math.min(Math.max(t, 0), 1) * (RAMP.length - 1);
+  const i = Math.min(Math.floor(x), RAMP.length - 2);
+  return Cesium.Color.lerp(RAMP[i], RAMP[i + 1], x - i, new Cesium.Color()).withAlpha(alpha);
+}
+
+/** Poids d'un événement : 1 + victimes (plafonnées) ; la presse seule compte moitié. */
+const eventWeight = (p) => (1 + Math.min(p.fatalities || 0, 50) / 5) * (p.confidence === "press" ? 0.5 : 1);
+
+function visibleEvents() {
+  return state.events.filter((f) => {
+    const p = f.properties;
+    if (state.cutoff && p.event_date && p.event_date > state.cutoff) return false;
+    if (!state.press && p.confidence === "press") return false;
+    return true;
+  });
+}
+
+const hexPrimitives = []; // primitives d'événements actuellement à l'écran
+const markerLayer = new Cesium.CustomDataSource("markers");
+viewer.dataSources.add(markerLayer);
+
+function clearEventRender() {
+  hexPrimitives.splice(0).forEach((p) => scene.primitives.remove(p));
+  markerLayer.entities.removeAll();
+}
+
+// Résolution H3 et mode selon l'altitude de la caméra.
+function pickRender() {
+  const h = viewer.camera.positionCartographic.height;
+  let res = null;
+  if (h > 9e6) res = 2;
+  else if (h > 4e6) res = 3;
+  else if (h > 1.8e6) res = 4;
+  if (state.viewMode === "markers") return { mode: "markers" };
+  if (state.viewMode === "hex") return { mode: "hex", res: res ?? (h > 6e5 ? 5 : 6) };
+  return res ? { mode: "hex", res } : { mode: "markers" };
+}
+
+function cellPolygon(cell) {
+  const boundary = h3.cellToBoundary(cell, false); // [lat, lng]
+  const lons = boundary.map((b) => b[1]);
+  if (Math.max(...lons) - Math.min(...lons) > 180) return null; // traverse l'antiméridien
+  return Cesium.Cartesian3.fromDegreesArray(boundary.flatMap(([lat, lng]) => [lng, lat]));
+}
+
+function renderHexagons(events, res) {
+  const cells = new Map();
+  for (const f of events) {
+    const [lon, lat] = f.geometry.coordinates;
+    const cell = h3.latLngToCell(lat, lon, res);
+    let c = cells.get(cell);
+    if (!c) cells.set(cell, (c = { cell, score: 0, events: [], fatalities: 0, verified: 0 }));
+    const p = f.properties;
+    c.score += eventWeight(p);
+    c.events.push(f);
+    if (p.confidence !== "press") {
+      c.verified++;
+      c.fatalities += p.fatalities || 0;
+    }
+  }
+  if (!cells.size) return;
+
+  const edge = h3.getHexagonEdgeLengthAvg(res, "m");
+  const maxScore = Math.max(...[...cells.values()].map((c) => c.score));
+  const instances = [];
+  for (const c of cells.values()) {
+    const positions = cellPolygon(c.cell);
+    if (!positions) continue;
+    const t = maxScore > 0 ? c.score / maxScore : 0;
+    const pressOnly = c.verified === 0;
+    const height = edge * (0.25 + 2.25 * Math.pow(t, 0.75));
+    instances.push(new Cesium.GeometryInstance({
+      geometry: new Cesium.PolygonGeometry({
+        polygonHierarchy: new Cesium.PolygonHierarchy(positions),
+        height: 0,
+        extrudedHeight: height,
+        vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT,
+      }),
+      attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(rampColor(t, pressOnly ? 0.5 : 0.88)) },
+      id: { panel: hexPanel(c, res) },
+    }));
+  }
+  if (!instances.length) return;
+  const prim = new Cesium.Primitive({
+    geometryInstances: instances,
+    appearance: new Cesium.PerInstanceColorAppearance({ translucent: true, closed: true }),
+    asynchronous: false,
+  });
+  scene.primitives.add(prim);
+  hexPrimitives.push(prim);
+}
+
+function hexPanel(c, res) {
+  const [lat, lon] = h3.cellToLatLng(c.cell);
+  const top = [...c.events].sort((a, b) => eventWeight(b.properties) - eventWeight(a.properties)).slice(0, 8);
+  const pressCount = c.events.length - c.verified;
+  return {
+    kind: "Zone d'activité",
+    title: `${c.events.length} événement${c.events.length > 1 ? "s" : ""}`,
+    badge: c.verified ? CONFIDENCE_LABELS.verified : CONFIDENCE_LABELS.press,
+    sourceLabel: `hexagone d'environ ${Math.round(h3.getHexagonEdgeLengthAvg(res, "km") * 2)} km`,
+    rows: [
+      ["Victimes (sources qualifiées)", c.fatalities || null],
+      ["Événements qualifiés", c.verified],
+      ["Détectés par la presse seule", pressCount || null],
+    ],
+    itemsTitle: top.length < c.events.length ? `Les ${top.length} plus marquants` : "Événements",
+    items: top.map((f) => {
+      const p = f.properties;
+      return {
+        title: p.name || "Événement",
+        meta: [EVENT_TYPE_LABELS[p.event_type] || p.event_type, frDate(p.event_date), p.fatalities ? `${p.fatalities} victimes` : null].filter(Boolean).join(" · "),
+        url: p.sources?.find((s) => isUrl(s.url))?.url,
+      };
+    }),
+    lon, lat, zoomRange: h3.getHexagonEdgeLengthAvg(res, "m") * 10,
+  };
+}
+
+// Marqueurs lumineux (mise en cache des textures par couleur et taille).
+const glowCache = new Map();
+function glowIcon(hex, size, ring) {
+  const key = `${hex}|${size}|${ring}`;
+  if (glowCache.has(key)) return glowCache.get(key);
+  const c = document.createElement("canvas");
+  c.width = c.height = 128;
+  const g = c.getContext("2d");
+  const grad = g.createRadialGradient(64, 64, 4, 64, 64, 62);
+  grad.addColorStop(0, hex + "ff");
+  grad.addColorStop(0.28, hex + "aa");
+  grad.addColorStop(1, hex + "00");
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 128, 128);
+  g.beginPath();
+  g.arc(64, 64, 11, 0, Math.PI * 2);
+  g.fillStyle = "#fff";
+  g.fill();
+  g.beginPath();
+  g.arc(64, 64, 8, 0, Math.PI * 2);
+  g.fillStyle = hex;
+  g.fill();
+  if (ring) {
+    g.beginPath();
+    g.arc(64, 64, 20, 0, Math.PI * 2);
+    g.lineWidth = 4;
+    g.strokeStyle = "#4caf7d";
+    g.stroke();
+  }
+  glowCache.set(key, c);
+  return c;
+}
+
+function renderMarkers(events) {
+  const today = Date.now();
+  markerLayer.entities.suspendEvents();
+  for (const f of events) {
+    const [lon, lat] = f.geometry.coordinates;
+    const p = f.properties;
+    const hex = EVENT_TYPE_COLORS[p.event_type] || "#e2463b";
+    const base = p.confidence === "press" ? 0.34 : 0.5 + Math.min(Math.sqrt(p.fatalities || 0) * 0.09, 0.55);
+    const recent = p.event_date && today - Date.parse(p.event_date) < 3 * 86400000;
+    const phase = Math.random() * 6;
+    const entity = markerLayer.entities.add({
+      position: Cesium.Cartesian3.fromDegrees(lon, lat),
+      billboard: {
+        image: glowIcon(hex, 0, p.confidence === "confirmed"),
+        scale: recent ? new Cesium.CallbackProperty(() => base * (1 + 0.14 * Math.sin(Date.now() / 480 + phase)), false) : base,
+        color: Cesium.Color.WHITE.withAlpha(p.confidence === "press" ? 0.75 : 1),
+        disableDepthTestDistance: 30000,
+      },
+      name: p.name || "Événement",
+    });
+    panelInfo.set(entity, {
+      kind: EVENT_TYPE_LABELS[p.event_type] || p.event_type || "Événement",
+      title: p.name || "Événement",
+      badge: CONFIDENCE_LABELS[p.confidence] || CONFIDENCE_LABELS.press,
+      sourceLabel: (p.sources || []).map((x) => x.label).filter((v, i, a) => a.indexOf(v) === i).join(" + "),
+      rows: [
+        ["Date", p.date_start ? `du ${frDate(p.date_start)} au ${frDate(p.event_date)}` : frDate(p.event_date)],
+        ["Victimes", p.fatalities],
+        ["Précision du lieu", p.precision],
+      ],
+      sources: p.sources,
+      lon, lat,
+    });
+  }
+  markerLayer.entities.resumeEvents();
+}
+
+let lastRenderKey = "";
+function renderConflicts(force = false) {
+  const events = visibleEvents();
+  const r = pickRender();
+  const key = `${r.mode}|${r.res ?? ""}|${state.viewMode}`;
+  if (!force && key === lastRenderKey && renderConflicts.dataVersion === state.dataVersion && renderConflicts.cutoff === state.cutoff && renderConflicts.press === state.press) return;
+  lastRenderKey = key;
+  Object.assign(renderConflicts, { dataVersion: state.dataVersion, cutoff: state.cutoff, press: state.press });
+  clearEventRender();
+  if (r.mode === "hex") renderHexagons(events, r.res);
+  else renderMarkers(events);
+  updateViewSummary();
+}
+
+// ───────────────────────── « Dans la vue » ─────────────────────────
+/** Emprise réellement visible : on lance des rayons depuis l'écran vers le
+ * globe (fiable même en vue inclinée avec l'horizon) ; null = vue mondiale. */
+function viewBounds() {
+  if (viewer.camera.positionCartographic.height > 8e6) return null;
+  const c = scene.canvas;
+  const pts = [];
+  for (const [fx, fy] of [[.12, .18], [.88, .18], [.88, .88], [.12, .88], [.5, .5], [.5, .18], [.5, .88], [.12, .5], [.88, .5]]) {
+    const p = viewer.camera.pickEllipsoid(new Cesium.Cartesian2(c.clientWidth * fx, c.clientHeight * fy), scene.globe.ellipsoid);
+    if (p) pts.push(Cesium.Cartographic.fromCartesian(p));
+  }
+  if (pts.length < 5) return null;
+  const d = Cesium.Math.toDegrees;
+  const lon0 = d(pts[4]?.longitude ?? pts[0].longitude);
+  const rel = (lon) => ((d(lon) - lon0 + 540) % 360) - 180; // longitude relative au centre, sans saut à l'antiméridien
+  const rels = pts.map((p) => rel(p.longitude));
+  const lats = pts.map((p) => d(p.latitude));
+  return { lon0, w: Math.min(...rels), e: Math.max(...rels), s: Math.min(...lats), n: Math.max(...lats) };
+}
+
+function inBounds(b, lon, lat) {
+  const rel = ((lon - b.lon0 + 540) % 360) - 180;
+  return lat >= b.s && lat <= b.n && rel >= b.w && rel <= b.e;
+}
+
+function updateViewSummary() {
+  const b = viewBounds();
+  const events = visibleEvents().filter((f) => !b || inBounds(b, ...f.geometry.coordinates));
+  $("vs-scope").textContent = b ? "Zone visible" : "Monde entier";
+
+  let fat = 0, verified = 0;
+  const byType = {};
+  for (const f of events) {
+    const p = f.properties;
+    if (p.confidence !== "press") {
+      verified++;
+      fat += p.fatalities || 0;
+    }
+    byType[p.event_type] = (byType[p.event_type] || 0) + 1;
+  }
+  $("vs-events").textContent = events.length.toLocaleString("fr-FR");
+  $("vs-fat").textContent = fat.toLocaleString("fr-FR");
+  $("vs-verified").textContent = verified.toLocaleString("fr-FR");
+
+  const max = Math.max(1, ...Object.values(byType));
+  $("vs-types").innerHTML = Object.entries(byType)
+    .sort((a, b2) => b2[1] - a[1])
+    .map(([t, n]) => `<div class="type-bar"><span>${escapeHtml(EVENT_TYPE_LABELS[t] || t)}</span><span>${n}</span>
+      <div class="track"><div class="fill" style="width:${(n / max) * 100}%;background:${EVENT_TYPE_COLORS[t] || "#e2463b"}"></div></div></div>`)
+    .join("");
+}
+
+let moveTimer = null;
+viewer.camera.moveEnd.addEventListener(() => {
+  clearTimeout(moveTimer);
+  moveTimer = setTimeout(() => {
+    renderConflicts();
+    updateViewSummary();
+  }, 120);
+});
+
+// ───────────────────────── Timeline ─────────────────────────
+const timelineEl = $("timeline");
+const slider = $("timeline-slider");
+let timelineStart = null;
+let timelineTimer = null;
+let sliderRaf = 0;
+
+function stopPlayback() {
+  clearInterval(timelineTimer);
+  timelineTimer = null;
+  $("timeline-play").textContent = "▶";
+}
+
+function applyTimeline() {
+  if (!timelineStart) {
+    state.cutoff = null;
     return;
   }
-  try {
-    const res = await fetch("/data/ukraine-control.json");
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    const fmt = (yyyymmdd) => `${String(yyyymmdd).slice(6, 8)}/${String(yyyymmdd).slice(4, 6)}/${String(yyyymmdd).slice(0, 4)}`;
-    data.places.forEach(([lon, lat, st, changed, name, admin1]) => {
-      const style = CONTROL_STYLE[st];
-      const recent = changed > 0;
-      const entity = controlLayer.entities.add({
-        position: Cesium.Cartesian3.fromDegrees(lon, lat),
-        point: {
-          pixelSize: recent ? 8 : 4,
-          color: style.color.withAlpha(recent ? 0.95 : 0.55),
-          outlineColor: recent ? Cesium.Color.WHITE : style.color.withAlpha(0),
-          outlineWidth: recent ? 1.5 : 0,
-          disableDepthTestDistance: POINT_DEPTH_DISTANCE,
-        },
-        name: name || "Localité",
-      });
-      panelInfo.set(entity, {
-        kind: "Contrôle territorial (Ukraine)",
-        title: name || "Localité",
-        badge: RELIABILITY.modeled,
-        sourceLabel: "VIINA 2.0",
-        rows: [
-          ["Statut", style.label],
-          ["Région", admin1],
-          ["Dernier changement", recent ? fmt(changed) : null],
-          ["Données au", data.as_of],
-        ],
-        notes: "Estimation par vote entre plusieurs sources (DeepStateMap, ISW, Wikipédia, presse). Statut par localité, pas une ligne de front.",
-        url: data.url,
-        lon,
-        lat,
-      });
-    });
-    applyZone();
-    const d = new Date(data.as_of);
-    setLayerBadge("control-badge", { count: data.places.length, source: "viina", fetchedAt: d.toISOString() });
-    const badge = document.getElementById("control-badge");
-    badge.textContent = `au ${d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}`;
-  } catch (err) {
-    setLayerBadge("control-badge", { error: err.message });
+  const day = new Date(timelineStart.getTime() + Number(slider.value) * 86400000).toISOString().slice(0, 10);
+  state.cutoff = Number(slider.value) >= Number(slider.max) ? null : day;
+  $("timeline-label").textContent = `jusqu'au ${frDate(day)}`;
+  cancelAnimationFrame(sliderRaf);
+  sliderRaf = requestAnimationFrame(() => renderConflicts());
+}
+
+function setupTimeline() {
+  stopPlayback();
+  if (!state.events.some((f) => f.properties.event_date)) {
+    timelineStart = null;
+    timelineEl.hidden = true;
+    state.cutoff = null;
+    return;
   }
-}
-controlToggleEl.addEventListener("change", loadControl);
-
-function loadAll() {
-  loadControl();
-  loadEvents();
-  loadNuclearSites();
-  loadMilitarySites();
-  loadInfrastructureSites();
+  const end = new Date();
+  end.setUTCHours(0, 0, 0, 0);
+  timelineStart = new Date(end.getTime() - state.days * 86400000);
+  slider.max = String(state.days);
+  slider.value = String(state.days);
+  timelineEl.hidden = false;
+  applyTimeline();
 }
 
-refreshBtn.addEventListener("click", loadAll);
-daysEl.addEventListener("change", loadEvents);
-EVENT_SOURCES.forEach((src) => document.getElementById(src.toggleId).addEventListener("change", loadEvents));
-document.getElementById("press-toggle").addEventListener("change", (e) => {
-  showPressOnly = e.target.checked;
+slider.addEventListener("input", () => {
+  stopPlayback();
   applyTimeline();
 });
-countryEl.addEventListener("change", () => {
-  // Choisir un pays cadre la caméra dessus et limite toutes les couches à
-  // son cadre ; "Tous" retire le cadre.
-  const bbox = countryBounds[countryEl.value];
-  regionEl.value = "";
-  setZone(bbox || null);
+$("timeline-play").addEventListener("click", () => {
+  if (timelineTimer) return stopPlayback();
+  if (Number(slider.value) >= Number(slider.max)) slider.value = "0";
+  $("timeline-play").textContent = "⏸";
+  const step = Math.max(1, Math.round(state.days / 60)); // ~60 images quelle que soit la période
+  timelineTimer = setInterval(() => {
+    if (Number(slider.value) >= Number(slider.max)) return stopPlayback();
+    slider.value = String(Math.min(Number(slider.max), Number(slider.value) + step));
+    applyTimeline();
+  }, 220);
+});
+
+// ───────────────────────── Chargement des conflits ─────────────────────────
+const SOURCE_DOT = { acled: "ACLED", ucdp: "UCDP", gdelt: "GDELT" };
+
+async function loadEvents() {
+  $("status").textContent = "Chargement…";
+  const selected = EVENT_SOURCES.filter((k) => $(`${k}-toggle`).checked);
+  EVENT_SOURCES.forEach((k) => setStatus(k, selected.includes(k) ? { text: "chargement…", kind: "loading" } : {}));
+  if (!selected.length) {
+    state.events = [];
+    state.dataVersion = (state.dataVersion || 0) + 1;
+    setupTimeline();
+    renderConflicts(true);
+    return renderSourceAlert({}, selected);
+  }
+
+  const params = new URLSearchParams({ days: state.days, event_type: $("event-type").value, sources: selected.join(",") });
+  if ($("country").value) params.set("country", $("country").value);
+
+  try {
+    const data = await apiJson(`/api/conflicts?${params}`);
+    state.events = data.features || [];
+    state.dataVersion = (state.dataVersion || 0) + 1;
+    EVENT_SOURCES.forEach((k) => {
+      const st = data.sources?.[k];
+      if (!st) return;
+      if (!st.ok) {
+        $(`${k}-status`).title = st.error || "";
+        return setStatus(k, { text: "indisponible", kind: "warn" });
+      }
+      const un = st.meta?.unlocated;
+      $("ucdp-note").hidden = !(k === "ucdp" && un?.count);
+      if (k === "ucdp" && un?.count) {
+        $("ucdp-note").textContent = `UCDP : ${un.count} événement${un.count > 1 ? "s" : ""} sans localisation précise (${un.fatalities.toLocaleString("fr-FR")} victimes cumulées) ne sont pas cartographiés.`;
+      }
+      const upTo = st.meta?.latest_date ? `jusqu'au ${frDate(st.meta.latest_date).slice(0, 5)}` : "";
+      $(`${k}-status`).title = "";
+      setStatus(k, { text: [`${st.count} événement${st.count > 1 ? "s" : ""}`, upTo].filter(Boolean).join(" · "), kind: "ok" });
+    });
+    renderSourceAlert(data.sources, selected);
+    setupTimeline();
+    renderConflicts(true);
+    const confirmed = state.events.filter((f) => f.properties.confidence === "confirmed").length;
+    $("status").textContent = `${state.events.length} événement(s), dont ${confirmed} confirmé(s) — mis à jour à ${new Date().toLocaleTimeString("fr-FR")}`;
+  } catch (err) {
+    state.events = [];
+    state.dataVersion = (state.dataVersion || 0) + 1;
+    setupTimeline();
+    renderConflicts(true);
+    renderSourceAlert(null, selected, err.message);
+    $("status").textContent = `⚠️ Conflits indisponibles — ${err.message}`;
+  }
+}
+
+/** Alerte claire quand aucune source qualifiée ne répond, ou quand une source
+ * qualifiée est vide sur la période à cause de son décalage de publication. */
+function renderSourceAlert(sources, selected, fatalError) {
+  const el = $("source-alert");
+  const qualifiedOk = ["acled", "ucdp"].some((k) => sources?.[k]?.ok);
+  const ucdp = sources?.ucdp;
+  let html = "";
+  if (fatalError) html = `<strong>Serveur indisponible</strong> — ${escapeHtml(fatalError)}`;
+  else if (selected.length && !qualifiedOk) {
+    html = `<strong>Aucune source qualifiée disponible.</strong> Seuls des événements de presse, <em>non vérifiés</em>, sont affichés. <a href="/methodologie">Pourquoi ?</a>`;
+  } else if (ucdp?.ok && ucdp.count === 0 && state.days < 30 && ucdp.meta?.latest_date) {
+    html = `UCDP publie avec environ 2 semaines de décalage (données jusqu'au ${frDate(ucdp.meta.latest_date).slice(0, 5)}) : choisissez <strong>30 j</strong> ou plus pour voir ses événements.`;
+  }
+  el.innerHTML = html;
+  el.hidden = !html;
+}
+
+// ───────────────────────── Filtres & navigation ─────────────────────────
+const REGIONS = [
+  { name: "Ukraine", lon: 31.5, lat: 48.5, range: 1100000 },
+  { name: "Gaza / Israël / Liban", lon: 35.0, lat: 32.0, range: 350000 },
+  { name: "Syrie", lon: 38.0, lat: 35.0, range: 700000 },
+  { name: "Soudan", lon: 30.0, lat: 15.5, range: 1500000 },
+  { name: "Yémen / mer Rouge", lon: 44.0, lat: 15.0, range: 1200000 },
+  { name: "Sahel (Mali)", lon: -2.0, lat: 15.0, range: 1500000 },
+  { name: "Afghanistan", lon: 66.0, lat: 34.0, range: 1200000 },
+  { name: "Iran / Golfe", lon: 53.0, lat: 30.5, range: 1800000 },
+  { name: "Taïwan / mer de Chine", lon: 121.0, lat: 24.0, range: 1000000 },
+  { name: "Corée", lon: 127.5, lat: 37.5, range: 900000 },
+  { name: "Monde", lon: 10.0, lat: 20.0, range: 22000000, pitch: -90 },
+];
+REGIONS.forEach((r, i) => {
+  const opt = document.createElement("option");
+  opt.value = String(i);
+  opt.textContent = r.name;
+  $("region").appendChild(opt);
+});
+$("region").addEventListener("change", () => {
+  const r = REGIONS[Number($("region").value)];
+  if (!r) return;
+  viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(Cesium.Cartesian3.fromDegrees(r.lon, r.lat, 0), r.range / 4), {
+    duration: 2.5,
+    offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(r.pitch ?? -40), r.range),
+  });
+});
+
+const countryBounds = {};
+function frameBBox([w, s, e, n]) {
+  const center = Cesium.Cartesian3.fromDegrees((w + e) / 2, (s + n) / 2, 0);
+  const radius = Cesium.Cartesian3.distance(center, Cesium.Cartesian3.fromDegrees(e, n, 0));
+  const wide = radius > 2500000; // très grand pays : vue plongeante, distance plafonnée
+  viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(center, wide ? 2500000 : radius), {
+    duration: 2.5,
+    offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(wide ? -90 : -50), wide ? 12000000 : radius * 2.4),
+  });
+}
+
+async function loadFilters() {
+  try {
+    const f = await apiJson("/api/filters");
+    f.countries.forEach(({ code, name, bbox }) => {
+      if (bbox) countryBounds[code] = bbox;
+      $("country").add(new Option(name, code));
+    });
+    f.event_types.filter((t) => t !== "all").forEach((t) => $("event-type").add(new Option(EVENT_TYPE_LABELS[t] || t, t)));
+  } catch (err) {
+    $("status").textContent = `Filtres indisponibles (${err.message})`;
+  }
+}
+
+$("period").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-days]");
+  if (!b) return;
+  $("period").querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b));
+  state.days = Number(b.dataset.days);
+  loadEvents();
+});
+$("view-mode").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-mode]");
+  if (!b) return;
+  $("view-mode").querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b));
+  state.viewMode = b.dataset.mode;
+  renderConflicts(true);
+});
+$("country").addEventListener("change", () => {
+  const bbox = countryBounds[$("country").value];
   if (bbox) frameBBox(bbox);
   loadEvents();
 });
-eventTypeEl.addEventListener("change", loadEvents);
-nuclearToggleEl.addEventListener("change", loadNuclearSites);
-militaryToggleEl.addEventListener("change", loadMilitarySites);
-infrastructureToggleEl.addEventListener("change", loadInfrastructureSites);
+$("event-type").addEventListener("change", loadEvents);
+EVENT_SOURCES.forEach((k) => $(`${k}-toggle`).addEventListener("change", loadEvents));
+$("press-toggle").addEventListener("change", (e) => {
+  state.press = e.target.checked;
+  renderConflicts(true);
+});
+$("refresh").addEventListener("click", loadAll);
 
-// La hauteur repliée/dépliée est calculée depuis le contenu réel
-// (scrollHeight) plutôt qu'une valeur fixe : le nombre de groupes/couches
-// peut varier, une valeur fixe finit toujours par couper quelque chose
-// (c'était le bug avec l'horloge mondiale).
-function syncToolbarHeight() {
-  if (!toolbarEl.classList.contains("collapsed")) {
-    toolbarEl.style.maxHeight = `${toolbarEl.scrollHeight}px`;
-  }
-}
-
-toolbarToggleBtn.addEventListener("click", () => {
-  const collapsed = toolbarEl.classList.toggle("collapsed");
-  toolbarToggleBtn.textContent = collapsed ? "▼" : "▲";
-  toolbarToggleBtn.setAttribute("aria-expanded", String(!collapsed));
-  if (!collapsed) syncToolbarHeight();
+$("daynight-toggle").addEventListener("change", (e) => {
+  scene.globe.enableLighting = e.target.checked;
 });
 
-new ResizeObserver(syncToolbarHeight).observe(toolbarEl);
-
-
-// Cadre de zone : quand une région est active, seuls les éléments situés
-// dans son cadre réel sont affichés (sur toutes les couches), et le cadre
-// est tracé sur le globe. "Toute la planète" retire le cadre.
-let activeZone = null; // [ouest, sud, est, nord] en degrés
-const zoneLayer = new Cesium.CustomDataSource("zone");
-viewer.dataSources.add(zoneLayer);
-const zoneLabelEl = document.getElementById("zone-label");
-
-function entityInZone(entity) {
-  if (!activeZone) return true;
-  const info = panelInfo.get(entity);
-  if (!info) return true;
-  const [w, s, e, n] = activeZone;
-  return info.lon >= w && info.lon <= e && info.lat >= s && info.lat <= n;
+// Villes 3D photoréalistes (maillage Google via Cesium Ion), chargées à la demande.
+let photo3d = null;
+if (!ionToken) {
+  $("photo3d-toggle").disabled = true;
+  $("photo3d-toggle").parentElement.title = "Nécessite un token Cesium Ion";
 }
-
-function applyZone() {
-  applyTimeline();
-  [nuclearLayer, militaryLayer, infrastructureLayer, controlLayer].forEach((layer) => {
-    layer.entities.values.forEach((entity) => { entity.show = entityInZone(entity); });
-  });
-}
-
-function setZone(bbox) {
-  activeZone = bbox;
-  zoneLayer.entities.removeAll();
-  if (bbox) {
-    const [w, s, e, n] = bbox;
-    zoneLayer.entities.add({
-      polyline: {
-        positions: Cesium.Cartesian3.fromDegreesArray([w, s, e, s, e, n, w, n, w, s]),
-        width: 2,
-        clampToGround: true,
-        material: Cesium.Color.fromCssColorString("#5b8def").withAlpha(0.9),
-      },
-    });
-  }
-  zoneLabelEl.textContent = bbox ? `Zone : ${bbox.map((v) => v.toFixed(1)).join(" / ")}` : "Zone : toute la planète";
-  applyZone();
-}
-
-document.getElementById("zone-view").addEventListener("click", () => {
-  const rect = viewer.camera.computeViewRectangle();
-  if (!rect) return setZone(null);
-  const deg = Cesium.Math.toDegrees;
-  const box = [deg(rect.west), deg(rect.south), deg(rect.east), deg(rect.north)];
-  // Vue qui embrasse toute la planète (ou un pôle) : pas de cadre utile.
-  setZone(box[2] - box[0] >= 350 || box[3] - box[1] >= 170 ? null : box);
-  regionEl.value = "";
-});
-document.getElementById("zone-clear").addEventListener("click", () => {
-  setZone(null);
-  regionEl.value = "";
-  if (countryEl.value) {
-    countryEl.value = "";
-    loadEvents();
+$("photo3d-toggle").addEventListener("change", async (e) => {
+  try {
+    if (e.target.checked) {
+      if (!photo3d) {
+        photo3d = await Cesium.createGooglePhotorealistic3DTileset();
+        scene.primitives.add(photo3d);
+      }
+      photo3d.show = true;
+      scene.globe.show = false;
+    } else {
+      if (photo3d) photo3d.show = false;
+      scene.globe.show = true;
+    }
+  } catch (err) {
+    e.target.checked = false;
+    scene.globe.show = true;
+    $("status").textContent = `⚠️ Villes 3D indisponibles — ${err.message || err}`;
   }
 });
 
-loadFilters().then(loadAll).then(syncToolbarHeight);
+// Panneau de contrôle repliable (utile surtout sur mobile).
+$("controls-toggle").addEventListener("click", () => {
+  const hidden = $("controls").classList.toggle("hidden");
+  document.body.classList.toggle("controls-hidden", hidden);
+  $("controls-toggle").setAttribute("aria-expanded", String(!hidden));
+});
+if (matchMedia("(max-width: 900px)").matches) $("controls-toggle").click();
 
-// Horloge mondiale : UTC + quelques fuseaux stratégiques, intégrée dans
-// la barre d'outils, mise à jour chaque seconde via l'API Intl native du
-// navigateur (aucune dépendance ni service externe).
-const WORLD_CLOCK_CITIES = [
-  { label: "Washington", tz: "America/New_York" },
-  { label: "Londres", tz: "Europe/London" },
-  { label: "Kyiv", tz: "Europe/Kyiv" },
-  { label: "Moscou", tz: "Europe/Moscow" },
-  { label: "Jérusalem", tz: "Asia/Jerusalem" },
-  { label: "Pékin", tz: "Asia/Shanghai" },
+// ───────────────────────── Couches de contexte (icônes regroupées) ─────────────────────────
+function iconCanvas(glyph, color) {
+  const c = document.createElement("canvas");
+  c.width = c.height = 64;
+  const g = c.getContext("2d");
+  g.beginPath();
+  g.arc(32, 32, 26, 0, Math.PI * 2);
+  g.fillStyle = "rgba(10,14,22,0.92)";
+  g.fill();
+  g.lineWidth = 4;
+  g.strokeStyle = color;
+  g.stroke();
+  g.font = "28px system-ui, 'Apple Color Emoji', 'Segoe UI Emoji'";
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.fillText(glyph, 32, 34);
+  return c;
+}
+function clusterCanvas(n, color) {
+  const c = document.createElement("canvas");
+  c.width = c.height = 72;
+  const g = c.getContext("2d");
+  g.beginPath();
+  g.arc(36, 36, 30, 0, Math.PI * 2);
+  g.fillStyle = color + "33";
+  g.fill();
+  g.beginPath();
+  g.arc(36, 36, 22, 0, Math.PI * 2);
+  g.fillStyle = "rgba(10,14,22,0.95)";
+  g.fill();
+  g.lineWidth = 3;
+  g.strokeStyle = color;
+  g.stroke();
+  g.fillStyle = "#fff";
+  g.font = "bold 20px system-ui, sans-serif";
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.fillText(n > 99 ? "99+" : String(n), 36, 37);
+  return c;
+}
+
+const CONTEXT_LAYERS = [
+  { key: "nuclear", endpoint: "/api/nuclear-sites", glyph: "☢️", color: "#f4d03f", kind: "Installation nucléaire civile", provider: "Wikidata", empty: "Site nucléaire" },
+  { key: "military", endpoint: "/api/military-sites", glyph: "🎖️", color: "#5b9bf0", kind: "Site militaire", provider: "OpenStreetMap", empty: "Site militaire" },
+  { key: "infrastructure", endpoint: "/api/infrastructure-sites", glyph: "✈️", color: "#7ed6c1", kind: "Infrastructure", provider: "OpenStreetMap", empty: "Infrastructure" },
 ];
-
-const clockUtcEl = document.getElementById("clock-utc-time");
-const clockCitiesEl = document.getElementById("clock-cities");
-
-if (clockCitiesEl) {
-  clockCitiesEl.innerHTML = WORLD_CLOCK_CITIES.map(
-    (c) => `<span class="world-clock-city" data-tz="${c.tz}"><strong>--:--</strong> ${escapeHtml(c.label)}</span>`
-  ).join("");
+for (const L of CONTEXT_LAYERS) {
+  L.source = new Cesium.CustomDataSource(L.key);
+  L.source.clustering = new Cesium.EntityCluster({ enabled: true, pixelRange: 42, minimumClusterSize: 3, clusterBillboards: true, clusterLabels: false, clusterPoints: false });
+  L.source.clustering.clusterEvent.addEventListener((clustered, cluster) => {
+    cluster.label.show = false;
+    cluster.billboard.show = true;
+    cluster.billboard.verticalOrigin = Cesium.VerticalOrigin.CENTER;
+    cluster.billboard.image = clusterCanvas(clustered.length, L.color);
+    cluster.billboard.scale = 0.62;
+    cluster.billboard.disableDepthTestDistance = 30000;
+    // Pas de regroupements imposants à l'échelle du monde : couches de contexte
+    // visibles seulement en vue régionale.
+    cluster.billboard.distanceDisplayCondition = new Cesium.DistanceDisplayCondition(0, 4.5e6);
+  });
+  L.icon = iconCanvas(L.glyph, L.color);
+  viewer.dataSources.add(L.source);
 }
 
-function updateWorldClock() {
-  const now = new Date();
-  if (clockUtcEl) {
-    clockUtcEl.textContent = now.toISOString().substring(11, 19);
+async function loadContextLayer(L, retry = 0) {
+  L.source.entities.removeAll();
+  if (!$(`${L.key}-toggle`).checked) return layerStatus(L.key);
+  try {
+    const data = await apiJson(L.endpoint);
+    L.source.entities.suspendEvents();
+    for (const f of data.features || []) {
+      const [lon, lat] = f.geometry.coordinates;
+      const p = f.properties || {};
+      const entity = L.source.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(lon, lat),
+        billboard: { image: L.icon, scale: 0.5, disableDepthTestDistance: 30000, distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 4.5e6) },
+        name: p.name || L.empty,
+      });
+      panelInfo.set(entity, {
+        kind: `${L.glyph} ${L.kind}`,
+        title: p.name || L.empty,
+        badge: RELIABILITY.community,
+        sourceLabel: L.provider,
+        rows: [["Pays", p.country], ["Statut", p.status], ["Type", p.type], ["Opérateur", p.operator]],
+        lon, lat,
+      });
+    }
+    L.source.entities.resumeEvents();
+    layerStatus(L.key, { count: (data.features || []).length, fetchedAt: data.fetched_at, stale: data.stale, staleReason: data.stale_reason });
+  } catch (err) {
+    if (err.message.includes("en cours") && retry < 12) {
+      layerStatus(L.key, { loading: true });
+      setTimeout(() => loadContextLayer(L, retry + 1), 15000);
+      return;
+    }
+    layerStatus(L.key, { error: err.message });
   }
-  clockCitiesEl?.querySelectorAll("[data-tz]").forEach((el) => {
-    const tz = el.getAttribute("data-tz");
-    const time = new Intl.DateTimeFormat("fr-FR", { timeZone: tz, hour: "2-digit", minute: "2-digit" }).format(now);
-    const strong = el.querySelector("strong");
-    if (strong) strong.textContent = time;
+}
+CONTEXT_LAYERS.forEach((L) => $(`${L.key}-toggle`).addEventListener("change", () => loadContextLayer(L)));
+
+// ───────────────────────── Contrôle territorial (Ukraine) ─────────────────────────
+// Estimation VIINA agrégée en hexagones H3 posés au sol : teinte selon le
+// statut dominant, plus vive là où une localité a changé de main récemment.
+let controlPrimitive = null;
+let controlData = null;
+const CONTROL_RES = 5;
+
+function buildControl(data) {
+  const cells = new Map();
+  for (const [lon, lat, st, changed, name, admin1] of data.places) {
+    const cell = h3.latLngToCell(lat, lon, CONTROL_RES);
+    let c = cells.get(cell);
+    if (!c) cells.set(cell, (c = { cell, R: 0, C: 0, U: 0, recent: [], admin1 }));
+    c[st]++;
+    if (changed > 0) c.recent.push({ name, changed, st });
+  }
+  const instances = [];
+  for (const c of cells.values()) {
+    const positions = cellPolygon(c.cell);
+    if (!positions) continue;
+    const hasRecent = c.recent.length > 0;
+    let color;
+    if (c.R >= c.C && c.R > 0) color = Cesium.Color.fromCssColorString("#e0413a").withAlpha(hasRecent ? 0.62 : 0.4);
+    else if (c.C > 0) color = Cesium.Color.fromCssColorString("#f0a020").withAlpha(0.55);
+    else color = Cesium.Color.fromCssColorString("#4c9be8").withAlpha(0.5); // libéré récemment
+    const [lat, lon] = h3.cellToLatLng(c.cell);
+    instances.push(new Cesium.GeometryInstance({
+      geometry: new Cesium.PolygonGeometry({ polygonHierarchy: new Cesium.PolygonHierarchy(positions), vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT }),
+      attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(color) },
+      id: {
+        panel: {
+          kind: "Contrôle territorial (Ukraine)",
+          title: c.R >= c.C && c.R > 0 ? "Zone sous contrôle russe" : c.C > 0 ? "Zone contestée" : "Zone récemment libérée",
+          badge: RELIABILITY.modeled,
+          sourceLabel: "VIINA 2.0",
+          rows: [["Région", c.admin1], ["Localités sous contrôle russe", c.R || null], ["Localités contestées", c.C || null], ["Données au", frDate(data.as_of)]],
+          itemsTitle: "Changements de main récents",
+          items: c.recent.sort((a, b) => b.changed - a.changed).slice(0, 8).map((r) => ({
+            title: r.name,
+            meta: `${r.st === "R" ? "passée sous contrôle russe" : r.st === "C" ? "devenue contestée" : "libérée"} · ${String(r.changed).replace(/(\d{4})(\d{2})(\d{2})/, "$3/$2/$1")}`,
+          })),
+          notes: "Estimation par vote entre plusieurs sources (DeepStateMap, ISW, Wikipédia, presse), agrégée en hexagones de ~17 km. Ce n'est pas une ligne de front officielle.",
+          url: data.url,
+          lon, lat, zoomRange: 60000,
+        },
+      },
+    }));
+  }
+  return new Cesium.GroundPrimitive({
+    geometryInstances: instances,
+    appearance: new Cesium.PerInstanceColorAppearance({ flat: true, translucent: true }),
+    classificationType: Cesium.ClassificationType.TERRAIN,
+    asynchronous: false,
   });
 }
 
-updateWorldClock();
-setInterval(updateWorldClock, 1000);
+async function loadControl() {
+  if (controlPrimitive) {
+    scene.groundPrimitives.remove(controlPrimitive);
+    controlPrimitive = null;
+  }
+  if (!$("control-toggle").checked) return layerStatus("control");
+  try {
+    if (!controlData) {
+      const res = await fetch("/data/ukraine-control.json");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      controlData = await res.json();
+    }
+    controlPrimitive = scene.groundPrimitives.add(buildControl(controlData));
+    layerStatus("control", { count: controlData.places.length, note: `au ${frDate(controlData.as_of).slice(0, 5)}` });
+  } catch (err) {
+    layerStatus("control", { error: err.message });
+  }
+}
+$("control-toggle").addEventListener("change", loadControl);
+
+// ───────────────────────── Démarrage ─────────────────────────
+function loadAll() {
+  loadEvents();
+  loadControl();
+  CONTEXT_LAYERS.forEach((L) => loadContextLayer(L));
+}
+
+// Horloge UTC
+function tickClock() {
+  $("clock-utc").textContent = new Date().toISOString().substring(11, 19);
+}
+tickClock();
+setInterval(tickClock, 1000);
+
+loadFilters().then(loadAll);
 
 })();

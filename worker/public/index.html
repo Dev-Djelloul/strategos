@@ -4,122 +4,151 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Strategos — Globe des conflits</title>
-  <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Widgets/widgets.css" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Widgets/widgets.css" />
   <link rel="stylesheet" href="/static/style.css" />
 </head>
-<body>
-  <header class="topbar">
-    <div>
-      <h1>🌍 Strategos</h1>
-      <p class="subtitle">Globe des conflits et tensions géopolitiques</p>
+<body class="app">
+  <div id="cesiumContainer"></div>
+
+  <header class="topbar glass">
+    <button id="controls-toggle" class="icon-btn" aria-label="Afficher les contrôles" aria-expanded="true">☰</button>
+    <div class="brand">
+      <span class="brand-mark">🌍</span>
+      <div>
+        <h1>Strategos</h1>
+        <p>Conflits et tensions géopolitiques</p>
+      </div>
     </div>
-    <div class="topbar-actions">
-      <a class="btn-secondary link-btn" href="/methodologie" title="Sources, fiabilité, limites">Sources et méthodologie</a>
-      <button id="toolbar-toggle" class="btn-icon" title="Replier/déplier la barre d'outils" aria-expanded="true">▲</button>
+    <div class="topbar-right">
+      <span class="clock" title="Heure universelle"><span id="clock-utc">--:--:--</span> <small>UTC</small></span>
+      <a class="pill-link" href="/methodologie">Sources et méthodologie</a>
     </div>
   </header>
 
-  <div class="source-banner" id="source-banner" hidden></div>
-
-  <div class="toolbar" id="toolbar">
-    <div class="toolbar-group">
-      <span class="toolbar-group-label">Filtres conflits</span>
-      <div class="toolbar-row">
-        <div class="field">
-          <label for="days">Période</label>
-          <select id="days">
-            <option value="1">Dernières 24h</option>
-            <option value="7">7 derniers jours</option>
-            <option value="30">30 derniers jours</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="country">Pays</label>
-          <select id="country">
-            <option value="">Tous</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="event-type">Type</label>
-          <select id="event-type">
-            <option value="all">Tous</option>
-          </select>
-        </div>
-        <button id="refresh" class="btn-primary">↻ Actualiser</button>
+  <aside id="controls" class="controls glass">
+    <section class="card view-card">
+      <div class="card-head"><h2>Dans la vue</h2><span id="vs-scope" class="muted">Monde entier</span></div>
+      <div class="stats">
+        <div><b id="vs-events">–</b><span>événements</span></div>
+        <div><b id="vs-fat">–</b><span>victimes<sup>*</sup></span></div>
+        <div><b id="vs-verified">–</b><span>qualifiés</span></div>
       </div>
-    </div>
+      <div id="vs-types" class="type-bars"></div>
+      <p class="fineprint"><sup>*</sup> victimes déclarées par les sources qualifiées (UCDP, ACLED) ; la presse n'en fournit pas.</p>
+    </section>
 
-    <div class="toolbar-group">
-      <span class="toolbar-group-label">Sources de conflits</span>
-      <div class="toolbar-row">
-        <label class="toggle" title="Données qualifiées (accès API sur validation)"><input type="checkbox" id="acled-toggle" checked /> ACLED <span class="layer-badge" id="acled-badge"></span></label>
-        <label class="toggle" title="Uppsala Conflict Data Program - référence académique (jeton requis)"><input type="checkbox" id="ucdp-toggle" checked /> UCDP <span class="layer-badge" id="ucdp-badge"></span></label>
-        <label class="toggle" title="Détection automatique dans la presse mondiale - non vérifié"><input type="checkbox" id="gdelt-toggle" checked /> GDELT (presse) <span class="layer-badge" id="gdelt-badge"></span></label>
-        <label class="toggle" title="Décoché : n'affiche que les événements appuyés par une source qualifiée"><input type="checkbox" id="press-toggle" checked /> Événements presse seule</label>
+    <section class="card">
+      <div class="card-head"><h2>Période</h2></div>
+      <div class="segmented" id="period" role="group" aria-label="Période">
+        <button data-days="1">24 h</button>
+        <button data-days="7">7 j</button>
+        <button data-days="30" class="active">30 j</button>
+        <button data-days="90">90 j</button>
       </div>
-    </div>
-
-    <div class="toolbar-group">
-      <span class="toolbar-group-label">Couches</span>
-      <div class="toolbar-row">
-        <label class="toggle" title="Contrôle territorial des localités en Ukraine (VIINA, mise à jour quotidienne) — estimation agrégée"><input type="checkbox" id="control-toggle" /> 🟥 Contrôle (Ukraine) <span class="layer-badge" id="control-badge"></span></label>
-        <label class="toggle"><input type="checkbox" id="nuclear-toggle" checked /> ☢️ Sites nucléaires <span class="layer-badge" id="nuclear-badge"></span></label>
-        <label class="toggle"><input type="checkbox" id="military-toggle" /> 🎖️ Bases militaires <span class="layer-badge" id="military-badge"></span></label>
-        <label class="toggle"><input type="checkbox" id="infrastructure-toggle" /> 🛫 Infrastructures <span class="layer-badge" id="infrastructure-badge"></span></label>
+      <div class="field-row">
+        <label class="field"><span>Pays</span>
+          <select id="country"><option value="">Tous</option></select>
+        </label>
+        <label class="field"><span>Type</span>
+          <select id="event-type"><option value="all">Tous</option></select>
+        </label>
       </div>
-    </div>
+    </section>
 
-    <div class="toolbar-group">
-      <span class="toolbar-group-label">Navigation 3D</span>
-      <div class="toolbar-row">
-        <div class="field">
-          <label for="region">Aller à</label>
-          <select id="region"><option value="">Choisir une région…</option></select>
-        </div>
-        <div class="field zone-field">
-          <label>Cadre de zone</label>
-          <div class="zone-buttons">
-            <button id="zone-view" class="btn-secondary" title="Limite toutes les couches à la zone actuellement visible">⬚ Cadrer la vue</button>
-            <button id="zone-clear" class="btn-secondary" title="Retire le cadre">Toute la planète</button>
-          </div>
-        </div>
-        <label class="toggle" title="Villes et reliefs en 3D photoréaliste (Google Photorealistic 3D Tiles via Cesium Ion), à zoom rapproché"><input type="checkbox" id="photo3d-toggle" /> Villes 3D photoréalistes</label>
+    <section class="card">
+      <div class="card-head"><h2>Sources de conflits</h2></div>
+      <div id="source-alert" class="alert" hidden></div>
+      <label class="row" title="Données qualifiées (accès API restreint)">
+        <input type="checkbox" class="switch" id="acled-toggle" checked />
+        <span class="dot" style="--c:#4caf7d"></span>
+        <span class="row-main">ACLED <small id="acled-status" class="status"></small></span>
+      </label>
+      <label class="row" title="Uppsala Conflict Data Program — référence académique, environ 2 semaines de décalage">
+        <input type="checkbox" class="switch" id="ucdp-toggle" checked />
+        <span class="dot" style="--c:#4caf7d"></span>
+        <span class="row-main">UCDP <small id="ucdp-status" class="status"></small></span>
+      </label>
+      <label class="row" title="Détection automatique dans la presse mondiale — non vérifié">
+        <input type="checkbox" class="switch" id="gdelt-toggle" checked />
+        <span class="dot" style="--c:#e0a13c"></span>
+        <span class="row-main">GDELT · presse <small id="gdelt-status" class="status"></small></span>
+      </label>
+      <p id="ucdp-note" class="fineprint" hidden></p>
+      <label class="row sub" title="Décoché : seuls les événements appuyés par une source qualifiée restent">
+        <input type="checkbox" class="switch" id="press-toggle" checked />
+        <span class="row-main">Inclure les événements « presse seule »</span>
+      </label>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>Couches</h2></div>
+      <label class="row" title="Contrôle territorial des localités en Ukraine (VIINA) — estimation agrégée">
+        <input type="checkbox" class="switch" id="control-toggle" />
+        <span class="row-main">Contrôle territorial · Ukraine <small id="control-status" class="status"></small></span>
+      </label>
+      <label class="row">
+        <input type="checkbox" class="switch" id="nuclear-toggle" checked />
+        <span class="row-main">☢️ Sites nucléaires civils <small id="nuclear-status" class="status"></small></span>
+      </label>
+      <label class="row">
+        <input type="checkbox" class="switch" id="military-toggle" />
+        <span class="row-main">🎖️ Bases militaires <small id="military-status" class="status"></small></span>
+      </label>
+      <label class="row">
+        <input type="checkbox" class="switch" id="infrastructure-toggle" />
+        <span class="row-main">✈️ Infrastructures <small id="infrastructure-status" class="status"></small></span>
+      </label>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>Navigation</h2></div>
+      <label class="field"><span>Aller à</span>
+        <select id="region"><option value="">Choisir une région…</option></select>
+      </label>
+      <div class="segmented" id="view-mode" role="group" aria-label="Affichage des événements">
+        <button data-mode="auto" class="active" title="Hexagones de loin, marqueurs de près">Auto</button>
+        <button data-mode="hex" title="Colonnes hexagonales 3D">Hexagones</button>
+        <button data-mode="markers" title="Marqueurs individuels">Marqueurs</button>
       </div>
-    </div>
+      <label class="row" title="Villes et reliefs en 3D photoréaliste (Google via Cesium Ion), à zoom rapproché">
+        <input type="checkbox" class="switch" id="photo3d-toggle" />
+        <span class="row-main">Villes 3D photoréalistes</span>
+      </label>
+      <label class="row" title="Ombre du soleil en temps réel (la face nocturne est sombre)">
+        <input type="checkbox" class="switch" id="daynight-toggle" />
+        <span class="row-main">Jour / nuit en temps réel</span>
+      </label>
+      <button id="refresh" class="btn">↻ Actualiser les données</button>
+      <p id="status" class="fineprint"></p>
+    </section>
+  </aside>
 
-    <div class="toolbar-group">
-      <span class="toolbar-group-label">Heure</span>
-      <div class="toolbar-row world-clock-row">
-        <div class="world-clock-utc">
-          <span id="clock-utc-time">--:--:--</span>
-          <span class="world-clock-utc-label">UTC</span>
-        </div>
-        <div class="world-clock-cities" id="clock-cities"></div>
-      </div>
-    </div>
-
-    <div class="toolbar-status">
-      <span id="zone-label" class="status">Zone : toute la planète</span>
-      <span id="status" class="status"></span>
+  <div id="legend" class="legend glass">
+    <div class="legend-title">Intensité</div>
+    <div class="ramp"></div>
+    <div class="ramp-labels"><span>faible</span><span>forte</span></div>
+    <div class="legend-items">
+      <span><i class="lg lg-confirmed"></i> confirmé</span>
+      <span><i class="lg lg-verified"></i> qualifié</span>
+      <span><i class="lg lg-press"></i> presse</span>
     </div>
   </div>
 
-  <div id="cesiumContainer">
-    <div class="timeline" id="timeline" hidden>
-      <button id="timeline-play" class="btn-icon" title="Lecture / pause">▶</button>
-      <input type="range" id="timeline-slider" min="0" max="0" value="0" />
-      <span id="timeline-label" class="timeline-label"></span>
-    </div>
+  <div class="timeline glass" id="timeline" hidden>
+    <button id="timeline-play" class="icon-btn" title="Lecture / pause">▶</button>
+    <input type="range" id="timeline-slider" min="0" max="0" value="0" aria-label="Date affichée" />
+    <span id="timeline-label" class="timeline-label"></span>
   </div>
 
-  <aside id="side-panel" class="side-panel" aria-live="polite">
-    <button id="side-panel-close" class="btn-icon side-panel-close" title="Fermer">✕</button>
+  <aside id="side-panel" class="side-panel glass" aria-live="polite">
+    <button id="side-panel-close" class="icon-btn side-panel-close" title="Fermer">✕</button>
     <div id="side-panel-body"></div>
   </aside>
 
   <script src="/config.js"></script>
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Cesium.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/h3-js@4.1.0/dist/h3-js.umd.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>
