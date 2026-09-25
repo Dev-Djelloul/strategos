@@ -43,8 +43,8 @@ async function getAccessToken(env: Env): Promise<string> {
 
   if (!env.ACLED_EMAIL || !env.ACLED_PASSWORD) {
     throw new Error(
-      "ACLED_EMAIL / ACLED_PASSWORD absents des secrets du Worker (wrangler secret put ACLED_EMAIL). " +
-        "Voir README, section ACLED.",
+      "ACLED non configuré : l'API d'événements n'est plus ouverte aux adresses email personnelles " +
+        "(il faut une adresse académique ou institutionnelle). Voir README, section ACLED.",
     );
   }
   const res = await fetch(OAUTH_TOKEN_URL, {
