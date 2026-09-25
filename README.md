@@ -15,7 +15,10 @@ data — backend FastAPI, globe CesiumJS, plusieurs couches de données.
   alimente le globe et signale l'absence de source qualifiée ; la page
   détaille sources, fraîcheur, licences, règles de fusion et limites
   (générée depuis `services/sources_info.py`)
-- **Navigation 3D** — recherche de lieux (loupe), 11 régions pré-cadrées en
+- **Contrôle territorial (Ukraine, prototype)** — localités sous contrôle russe
+  ou contestées et changements de main récents, d'après VIINA (ODbL).
+  Estimation issue d'un vote entre sources, pas une ligne de front ; fichier
+  statique produit par `worker/scripts/build_control.py` — recherche de lieux (loupe), 11 régions pré-cadrées en
   vue inclinée, et « Villes 3D photoréalistes » (Google Photorealistic 3D
   Tiles via Cesium Ion, nécessite le token)
 - **Sources de conflits fusionnées** — ACLED, UCDP et GDELT sont regroupés
@@ -131,10 +134,22 @@ npx wrangler deploy
 Les limites de CPU du plan Workers Free (10 ms/requête) sont serrées pour
 la collecte GDELT ; le plan Workers Paid est recommandé.
 
+## Mettre à jour le contrôle territorial
+
+Le fichier `worker/public/data/ukraine-control.json` est un instantané produit
+hors du Worker (les données VIINA pèsent ~450 Mo en CSV) :
+
+```bash
+cd worker && python3 scripts/build_control.py   # puis npx wrangler deploy
+```
+
+À automatiser plus tard (tâche planifiée). Attribution VIINA obligatoire (ODbL).
+
 ## Roadmap
 
 - [x] Timeline des événements (curseur + lecture sur la période choisie)
 - [ ] Historique long terme (au-delà de 30 jours, pas seulement l'instantané)
-- [ ] Zones de contrôle territorial (pas de source ouverte identifiée pour
-  l'instant - à rechercher)
+- [~] Zones de contrôle territorial : prototype Ukraine (VIINA). Pas de
+  source ouverte trouvée pour les autres conflits ; demandes d'accès
+  DeepStateMap / ISW en cours
 - [x] Backend et frontend sur Cloudflare (Worker + assets) — à déployer

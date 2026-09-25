@@ -86,6 +86,16 @@ export const LAYER_SOURCES = [
   },
 ];
 
+export const CONTROL_SOURCE = {
+  name: "Contrôle territorial (Ukraine)",
+  provider: "VIINA 2.0 — Université Notre-Dame",
+  url: "https://github.com/zhukovyuri/VIINA",
+  freshness: "Instantané quotidien (fichier statique)",
+  license: "ODbL 1.0 — attribution obligatoire",
+  note:
+    "Statut par localité (russe / contesté), avec les changements de main des 90 derniers jours, issu d'un vote entre DeepStateMap, ISW, Wikipédia et des rapports de presse. C'est une estimation, pas une ligne de front officielle. Ukraine uniquement : aucune source ouverte équivalente n'a été trouvée pour les autres conflits.",
+};
+
 export const BASEMAP_CREDITS: [string, string][] = [
   ["Imagerie satellite et calques de référence", "Esri, Maxar, Earthstar Geographics"],
   ["Relief mondial", "Cesium World Terrain (Cesium ion)"],

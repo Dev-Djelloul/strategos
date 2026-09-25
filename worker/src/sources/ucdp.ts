@@ -68,6 +68,7 @@ async function fetchWindow(env: Env, ctx: Ctx, days: number): Promise<FeatureCol
   const start = new Date(end.getTime() - days * 86400000);
   const seen = new Set<number>();
   const features: Feature[] = [];
+  let latestSeen = ""; // dernière date de la version, même hors de la fenêtre demandée
 
   for (const version of versions) {
     for (let page = 0; page < MAX_PAGES; page++) {
@@ -86,6 +87,7 @@ async function fetchWindow(env: Env, ctx: Ctx, days: number): Promise<FeatureCol
         const lon = Number(r.longitude);
         if (Number.isNaN(lat) || Number.isNaN(lon)) continue;
         const day = (r.date_end ?? "").slice(0, 10);
+        if (day > latestSeen) latestSeen = day;
         if (day && (day < iso(start) || day > iso(end))) continue;
         features.push({
           type: "Feature",
@@ -104,8 +106,7 @@ async function fetchWindow(env: Env, ctx: Ctx, days: number): Promise<FeatureCol
       if (page + 1 >= (payload.TotalPages ?? 1)) break;
     }
   }
-  const dates = features.map((f) => f.properties.event_date as string).filter(Boolean).sort();
-  return { type: "FeatureCollection", features, versions, latest_date: dates.at(-1) ?? null };
+  return { type: "FeatureCollection", features, versions, latest_date: latestSeen || null };
 }
 
 export async function fetchUcdpEvents(
@@ -121,7 +122,7 @@ export async function fetchUcdpEvents(
   }
   // Fenêtres regroupées (7/30/90 j) pour mutualiser le cache entre requêtes.
   const bucket = opts.days <= 7 ? 7 : opts.days <= 30 ? 30 : 90;
-  const all = await cachedFetch(env, ctx, `ucdp_events_v2_${bucket}`, EVENTS_TTL_SECONDS, () => fetchWindow(env, ctx, bucket), 25000);
+  const all = await cachedFetch(env, ctx, `ucdp_events_v3_${bucket}`, EVENTS_TTL_SECONDS, () => fetchWindow(env, ctx, bucket), 25000);
 
   const cutoff = iso(new Date(Date.now() - opts.days * 86400000));
   const countryName = opts.country ? COUNTRIES[opts.country] : null;

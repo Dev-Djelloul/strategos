@@ -1,6 +1,6 @@
 /** Page "Sources et méthodologie", générée depuis sourcesInfo.ts. */
 import type { Env } from "./types.ts";
-import { BASEMAP_CREDITS, CONFLICT_SOURCES, LAYER_SOURCES, isConfigured } from "./sourcesInfo.ts";
+import { BASEMAP_CREDITS, CONFLICT_SOURCES, CONTROL_SOURCE, LAYER_SOURCES, isConfigured } from "./sourcesInfo.ts";
 
 const esc = (s: string): string =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -32,7 +32,7 @@ export function renderMethodology(env: Env): string {
         </article>`;
   }).join("");
 
-  const layers = LAYER_SOURCES.map(
+  const layers = [...LAYER_SOURCES, { ...CONTROL_SOURCE, provider: CONTROL_SOURCE.provider }].map(
     (l) => `<tr><td>${esc(l.name)}</td><td><a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.provider)}</a></td><td>${esc(l.freshness)}</td><td>${esc(l.license)}</td><td>${esc(l.note)}</td></tr>`,
   ).join("");
   const credits = BASEMAP_CREDITS.map(([what, who]) => `<li><strong>${esc(what)}</strong> — ${esc(who)}</li>`).join("");
@@ -126,6 +126,7 @@ export function renderMethodology(env: Env): string {
       <h2>Crédits et attributions</h2>
       <ul>
         ${credits}
+        <li><strong>Contrôle territorial</strong> — contient des informations issues de VIINA 2.0 (Université Notre-Dame), mises à disposition sous licence <a href="https://opendatacommons.org/licenses/odbl/1.0/" target="_blank" rel="noopener noreferrer">ODbL</a>.</li>
         <li><strong>Données de conflits</strong> — ACLED, UCDP (Uppsala University) et GDELT, selon leurs conditions respectives ci-dessus.</li>
       </ul>
     </section>

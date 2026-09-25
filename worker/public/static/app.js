@@ -174,10 +174,12 @@ const conflictsLayer = new Cesium.CustomDataSource("conflicts");
 const nuclearLayer = new Cesium.CustomDataSource("nuclear");
 const militaryLayer = new Cesium.CustomDataSource("military");
 const infrastructureLayer = new Cesium.CustomDataSource("infrastructure");
+const controlLayer = new Cesium.CustomDataSource("control");
 viewer.dataSources.add(conflictsLayer);
 viewer.dataSources.add(nuclearLayer);
 viewer.dataSources.add(militaryLayer);
 viewer.dataSources.add(infrastructureLayer);
+viewer.dataSources.add(controlLayer);
 
 const statusEl = document.getElementById("status");
 const daysEl = document.getElementById("days");
@@ -263,6 +265,7 @@ const RELIABILITY = {
   verified: { label: "Source qualifiée", cls: "rel-verified" },
   press: { label: "Presse — non vérifié", cls: "rel-press" },
   community: { label: "Base collaborative", cls: "rel-community" },
+  modeled: { label: "Estimation agrégée", cls: "rel-community" },
 };
 const sidePanelEl = document.getElementById("side-panel");
 const sidePanelBody = document.getElementById("side-panel-body");
@@ -610,7 +613,74 @@ const loadInfrastructureSites = () => loadSimpleLayer({
   color: INFRASTRUCTURE_COLOR, icon: "🛫", emptyLabel: "Infrastructure", badgeId: "infrastructure-badge", kindLabel: "Infrastructure", sourceLabel: "OpenStreetMap",
 });
 
+
+// Contrôle territorial (Ukraine) : localités sous contrôle russe/contesté,
+// et changements de main récents, d'après VIINA (ODbL). Fichier statique
+// produit par scripts/build_control.py : c'est un instantané quotidien,
+// une estimation issue d'un vote entre plusieurs sources, pas une ligne
+// de front officielle.
+const controlToggleEl = document.getElementById("control-toggle");
+const CONTROL_STYLE = {
+  R: { color: Cesium.Color.fromCssColorString("#e0413a"), label: "Sous contrôle russe" },
+  C: { color: Cesium.Color.fromCssColorString("#f0a020"), label: "Contesté" },
+  U: { color: Cesium.Color.fromCssColorString("#4c9be8"), label: "Sous contrôle ukrainien (changement récent)" },
+};
+
+async function loadControl() {
+  controlLayer.entities.removeAll();
+  if (!controlToggleEl.checked) {
+    setLayerBadge("control-badge");
+    return;
+  }
+  try {
+    const res = await fetch("/data/ukraine-control.json");
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const fmt = (yyyymmdd) => `${String(yyyymmdd).slice(6, 8)}/${String(yyyymmdd).slice(4, 6)}/${String(yyyymmdd).slice(0, 4)}`;
+    data.places.forEach(([lon, lat, st, changed, name, admin1]) => {
+      const style = CONTROL_STYLE[st];
+      const recent = changed > 0;
+      const entity = controlLayer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(lon, lat),
+        point: {
+          pixelSize: recent ? 8 : 4,
+          color: style.color.withAlpha(recent ? 0.95 : 0.55),
+          outlineColor: recent ? Cesium.Color.WHITE : style.color.withAlpha(0),
+          outlineWidth: recent ? 1.5 : 0,
+          disableDepthTestDistance: POINT_DEPTH_DISTANCE,
+        },
+        name: name || "Localité",
+      });
+      panelInfo.set(entity, {
+        kind: "Contrôle territorial (Ukraine)",
+        title: name || "Localité",
+        badge: RELIABILITY.modeled,
+        sourceLabel: "VIINA 2.0",
+        rows: [
+          ["Statut", style.label],
+          ["Région", admin1],
+          ["Dernier changement", recent ? fmt(changed) : null],
+          ["Données au", data.as_of],
+        ],
+        notes: "Estimation par vote entre plusieurs sources (DeepStateMap, ISW, Wikipédia, presse). Statut par localité, pas une ligne de front.",
+        url: data.url,
+        lon,
+        lat,
+      });
+    });
+    applyZone();
+    const d = new Date(data.as_of);
+    setLayerBadge("control-badge", { count: data.places.length, source: "viina", fetchedAt: d.toISOString() });
+    const badge = document.getElementById("control-badge");
+    badge.textContent = `au ${d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}`;
+  } catch (err) {
+    setLayerBadge("control-badge", { error: err.message });
+  }
+}
+controlToggleEl.addEventListener("change", loadControl);
+
 function loadAll() {
+  loadControl();
   loadEvents();
   loadNuclearSites();
   loadMilitarySites();
@@ -676,7 +746,7 @@ function entityInZone(entity) {
 
 function applyZone() {
   applyTimeline();
-  [nuclearLayer, militaryLayer, infrastructureLayer].forEach((layer) => {
+  [nuclearLayer, militaryLayer, infrastructureLayer, controlLayer].forEach((layer) => {
     layer.entities.values.forEach((entity) => { entity.show = entityInZone(entity); });
   });
 }
