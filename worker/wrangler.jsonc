@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "strategos",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-09-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    // Le Worker traite l'API et les pages générées ; tout le reste (page du
+    // globe, JS, CSS) est servi directement depuis les assets statiques.
+    "run_worker_first": ["/api/*", "/methodologie", "/config.js"]
+  },
+  "kv_namespaces": [
+    // Namespace "strategos-cache" (dédié : les autres namespaces du compte servent à d autres projets)
+    { "binding": "CACHE", "id": "d413140b8b07473882c97623e22890f9" }
+  ],
+  "triggers": {
+    // Toutes les 15 min : collecte GDELT + préchauffage des couches lentes.
+    "crons": ["*/15 * * * *"]
+  }
+}

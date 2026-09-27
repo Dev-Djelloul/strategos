@@ -1,0 +1,53 @@
+name: Mise à jour du contrôle territorial (VIINA)
+
+# Reconstruit worker/public/data/ukraine-control.json depuis VIINA (ODbL,
+# https://github.com/zhukovyuri/VIINA, mis à jour quotidiennement) et
+# redéploie le Worker. Les données VIINA pèsent ~450 Mo en CSV : c'est
+# pour ça que ce traitement se fait ici plutôt que dans le Worker lui-même.
+on:
+  schedule:
+    # 05:00 UTC : après la mise à jour quotidienne habituelle de VIINA.
+    - cron: "0 5 * * *"
+  workflow_dispatch: {} # déclenchement manuel depuis l'onglet Actions
+
+permissions:
+  contents: write # pour committer le fichier régénéré
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Génère le fichier de contrôle territorial
+        run: python3 worker/scripts/build_control.py
+
+      - name: Vérifie que le fichier a changé
+        id: diff
+        run: |
+          if git diff --quiet -- worker/public/data/ukraine-control.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Committe le nouveau fichier
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add worker/public/data/ukraine-control.json
+          git commit -m "Contrôle territorial : mise à jour automatique (VIINA)"
+          git push
+
+      - name: Installe les dépendances du Worker
+        if: steps.diff.outputs.changed == 'true'
+        working-directory: worker
+        run: npm ci
+
+      - name: Déploie sur Cloudflare
+        if: steps.diff.outputs.changed == 'true'
+        working-directory: worker
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
