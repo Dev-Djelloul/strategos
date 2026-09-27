@@ -43,19 +43,16 @@ data — backend FastAPI, globe CesiumJS, plusieurs couches de données.
 
 ## Configurer les sources de données
 
-### ACLED (conflits)
+### ACLED (non intégré)
 
-1. Crée un compte sur https://acleddata.com/user/register
-2. Renseigne ton email/mot de passe ACLED dans les secrets du Worker (`ACLED_EMAIL`, `ACLED_PASSWORD`)
-3. **L'API d'événements n'est plus ouverte aux adresses personnelles**
-   (confirmé par l'équipe ACLED, y compris pour des chercheurs
-   indépendants) : elles reçoivent le niveau *Open* (données agrégées
-   seulement → erreur 403). Il faut une adresse **académique ou
-   institutionnelle** : se réinscrire avec elle, puis écrire à
-   access@acleddata.com pour faire supprimer l'ancien compte et évaluer le
-   niveau (les événements détaillés, décalés d'environ une semaine,
-   demandent *Research* ou plus). Tant que ce n'est pas fait, la couche
-   indique « indisponible » (aucune donnée factice).
+Envisagé, mais **retiré de l'interface** : son API d'événements n'est plus
+ouverte aux adresses email personnelles (confirmé par l'équipe ACLED),
+seulement académiques/institutionnelles. Le code (`worker/src/sources/acled.ts`,
+route `/api/events`) reste disponible pour un usage manuel ou une
+réactivation future — il suffirait de reposer les secrets `ACLED_EMAIL` /
+`ACLED_PASSWORD` et de rajouter `acled` dans `DEFAULT_SOURCES`
+(`worker/src/conflicts.ts`) et dans les toggles du front (`public/index.html`,
+`EVENT_SOURCES` dans `public/static/app.js`).
 
 ### UCDP (conflits, référence académique)
 

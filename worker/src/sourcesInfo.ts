@@ -17,20 +17,10 @@ export interface ConflictSourceInfo {
   secrets: (keyof Env)[];
 }
 
+// ACLED a été envisagé (voir NOT_INTEGRATED ci-dessous) mais n'est plus
+// interrogé : son API d'événements n'est plus accessible aux adresses email
+// personnelles, seulement académiques/institutionnelles.
 export const CONFLICT_SOURCES: ConflictSourceInfo[] = [
-  {
-    key: "acled",
-    name: "ACLED",
-    full: "Armed Conflict Location & Event Data",
-    url: "https://acleddata.com/",
-    reliability: "verified",
-    kind: "Événements codés à la main par des analystes, à partir de sources multiples",
-    freshness: "Hebdomadaire (niveau Research : événements décalés d'environ une semaine)",
-    coverage: "Mondiale",
-    license: "Conditions d'utilisation ACLED — attribution obligatoire, pas de redistribution",
-    access: "Compte myACLED avec une adresse académique ou institutionnelle ; les adresses personnelles n'ont plus accès à l'API (niveau Open : données agrégées seulement)",
-    secrets: ["ACLED_EMAIL", "ACLED_PASSWORD"],
-  },
   {
     key: "ucdp",
     name: "UCDP GED",
@@ -56,6 +46,21 @@ export const CONFLICT_SOURCES: ConflictSourceInfo[] = [
     license: "Libre d'usage, citation du projet GDELT demandée",
     access: "Aucun compte requis",
     secrets: [],
+  },
+];
+
+export interface NotIntegratedSource {
+  name: string;
+  url: string;
+  reason: string;
+}
+
+export const NOT_INTEGRATED_SOURCES: NotIntegratedSource[] = [
+  {
+    name: "ACLED (Armed Conflict Location & Event Data)",
+    url: "https://acleddata.com/",
+    reason:
+      "Source de référence, très riche (des dizaines de types d'événements, y compris manifestations et violences mineures, codés à la main). Mais son API d'événements n'est plus accessible aux adresses email personnelles, seulement aux adresses académiques ou institutionnelles (confirmé par l'équipe ACLED). Le niveau public restant (« Open ») ne fournit que des données agrégées, pas d'événements individuels géolocalisés.",
   },
 ];
 

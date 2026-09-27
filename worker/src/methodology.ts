@@ -1,6 +1,6 @@
 /** Page "Sources et méthodologie", générée depuis sourcesInfo.ts. */
 import type { Env } from "./types.ts";
-import { BASEMAP_CREDITS, CONFLICT_SOURCES, CONTROL_SOURCE, LAYER_SOURCES, isConfigured } from "./sourcesInfo.ts";
+import { BASEMAP_CREDITS, CONFLICT_SOURCES, CONTROL_SOURCE, LAYER_SOURCES, NOT_INTEGRATED_SOURCES, isConfigured } from "./sourcesInfo.ts";
 
 const esc = (s: string): string =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -36,6 +36,9 @@ export function renderMethodology(env: Env): string {
     (l) => `<tr><td>${esc(l.name)}</td><td><a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.provider)}</a></td><td>${esc(l.freshness)}</td><td>${esc(l.license)}</td><td>${esc(l.note)}</td></tr>`,
   ).join("");
   const credits = BASEMAP_CREDITS.map(([what, who]) => `<li><strong>${esc(what)}</strong> — ${esc(who)}</li>`).join("");
+  const notIntegrated = NOT_INTEGRATED_SOURCES.map(
+    (s) => `<li><strong><a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.name)}</a></strong> — ${esc(s.reason)}</li>`,
+  ).join("");
 
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -104,6 +107,12 @@ export function renderMethodology(env: Env): string {
         <tbody>${layers}</tbody>
       </table>
       <p>Ces couches proviennent de bases collaboratives : elles sont incomplètes et peuvent contenir des erreurs. Elles se limitent volontairement à des sites <strong>civils ou publics et documentés</strong>.</p>
+    </section>
+
+    <section>
+      <h2>Sources envisagées, non intégrées</h2>
+      <p>Ces sources ont été évaluées mais ne sont pas utilisées, pour les raisons indiquées :</p>
+      <ul>${notIntegrated}</ul>
     </section>
 
     <section>

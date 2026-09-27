@@ -212,7 +212,7 @@ clickHandler.setInputAction((click) => {
 }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
 // ───────────────────────── État ─────────────────────────
-const EVENT_SOURCES = ["acled", "ucdp", "gdelt"];
+const EVENT_SOURCES = ["ucdp", "gdelt"];
 const state = {
   days: 30,
   events: [], // features fusionnées renvoyées par /api/conflicts
@@ -565,7 +565,7 @@ $("timeline-play").addEventListener("click", () => {
 });
 
 // ───────────────────────── Chargement des conflits ─────────────────────────
-const SOURCE_DOT = { acled: "ACLED", ucdp: "UCDP", gdelt: "GDELT" };
+const SOURCE_DOT = { ucdp: "UCDP", gdelt: "GDELT" };
 
 async function loadEvents() {
   $("status").textContent = "Chargement…";
@@ -621,7 +621,7 @@ async function loadEvents() {
  * qualifiée est vide sur la période à cause de son décalage de publication. */
 function renderSourceAlert(sources, selected, fatalError) {
   const el = $("source-alert");
-  const qualifiedOk = ["acled", "ucdp"].some((k) => sources?.[k]?.ok);
+  const qualifiedOk = ["ucdp"].some((k) => sources?.[k]?.ok); // ACLED : voir méthodologie (accès API fermé aux adresses personnelles)
   const ucdp = sources?.ucdp;
   let html = "";
   if (fatalError) html = `<strong>Serveur indisponible</strong> — ${escapeHtml(fatalError)}`;

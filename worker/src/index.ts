@@ -9,7 +9,7 @@ import { fetchGdeltEvents, ingestGdelt } from "./sources/gdelt.ts";
 import { fetchNuclearSites } from "./sources/nuclear.ts";
 import { fetchMilitarySites } from "./sources/military.ts";
 import { fetchInfrastructureSites } from "./sources/infrastructure.ts";
-import { PRIORITY, fetchConflicts } from "./conflicts.ts";
+import { DEFAULT_SOURCES, PRIORITY, fetchConflicts } from "./conflicts.ts";
 import type { SourceKey } from "./conflicts.ts";
 import { renderMethodology } from "./methodology.ts";
 
@@ -46,7 +46,7 @@ async function handleApi(url: URL, env: Env, ctx: Ctx): Promise<Response> {
 
     case "/api/conflicts": {
       const q = parseQuery(url, 1);
-      const wanted = (url.searchParams.get("sources") ?? PRIORITY.join(","))
+      const wanted = (url.searchParams.get("sources") ?? DEFAULT_SOURCES.join(","))
         .split(",")
         .filter((s): s is SourceKey => (PRIORITY as string[]).includes(s));
       return json(await fetchConflicts(env, ctx, { ...q, sources: wanted }));

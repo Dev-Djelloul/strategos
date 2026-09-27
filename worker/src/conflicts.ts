@@ -19,6 +19,10 @@ const CELL = 0.5; // degrés : taille des cases d'indexation spatiale
 
 export type SourceKey = "acled" | "ucdp" | "gdelt";
 export const PRIORITY: SourceKey[] = ["acled", "ucdp", "gdelt"]; // la plus fiable fournit titre/type
+// ACLED reste dans PRIORITY (utilisable via ?sources=acled si des identifiants
+// sont un jour reconfigurés) mais n'est plus interrogé par défaut : son API
+// d'événements n'est plus accessible aux adresses email personnelles.
+export const DEFAULT_SOURCES: SourceKey[] = ["ucdp", "gdelt"];
 
 export const SOURCES: Record<SourceKey, { label: string; reliability: "verified" | "press" }> = {
   acled: { label: "ACLED", reliability: "verified" },
