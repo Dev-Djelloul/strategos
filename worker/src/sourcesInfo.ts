@@ -62,6 +62,24 @@ export const NOT_INTEGRATED_SOURCES: NotIntegratedSource[] = [
     reason:
       "Source de référence, très riche (des dizaines de types d'événements, y compris manifestations et violences mineures, codés à la main). Mais son API d'événements n'est plus accessible aux adresses email personnelles, seulement aux adresses académiques ou institutionnelles (confirmé par l'équipe ACLED). Le niveau public restant (« Open ») ne fournit que des données agrégées, pas d'événements individuels géolocalisés.",
   },
+  {
+    name: "POLECAT (successeur d'ICEWS)",
+    url: "https://dataverse.harvard.edu/dataverse/POLECAT",
+    reason:
+      "Événements géolocalisés générés par apprentissage automatique (ontologie PLOVER), financé par le Program on Geostrategic Risk (ex-Political Instability Task Force, CIA). Présenté dans sa documentation comme mis à jour à l'heure/à la semaine, mais en pratique à l'arrêt : le dernier fichier publié sur Dataverse date d'août 2024 (vérifié via l'API Dataverse). Écarté pour éviter d'afficher des données obsolètes comme si elles étaient courantes.",
+  },
+  {
+    name: "ICEWS (Integrated Crisis Early Warning System)",
+    url: "https://dataverse.harvard.edu/dataverse/icews",
+    reason:
+      "Projet historique dont POLECAT est le successeur direct. Arrêté officiellement le 11 avril 2023 : plus aucune mise à jour.",
+  },
+  {
+    name: "Global Terrorism Database (GTD)",
+    url: "https://www.start.umd.edu/gtd/",
+    reason:
+      "Périmètre limité au terrorisme (hors combats conventionnels, manifestations, etc.) et mise à jour annuelle avec 1 à 2 ans de retard — inadapté à une carte se voulant proche du temps réel.",
+  },
 ];
 
 export const LAYER_SOURCES = [
