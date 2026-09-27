@@ -1447,10 +1447,14 @@ async function setPushButton(state) {
   }
 }
 
+// Enregistré inconditionnellement (PWA : installabilité + coquille hors-ligne),
+// même si les notifications elles-mêmes ne sont pas prises en charge/activées.
+const swRegistration = "serviceWorker" in navigator ? navigator.serviceWorker.register("/sw.js").catch(() => null) : Promise.resolve(null);
+
 async function initPush() {
-  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !vapidPublicKey) return setPushButton("unsupported");
+  const reg = await swRegistration;
+  if (!reg || !("PushManager" in window) || !vapidPublicKey) return setPushButton("unsupported");
   if (Notification.permission === "denied") return setPushButton("denied");
-  const reg = await navigator.serviceWorker.register("/sw.js");
   const existing = await reg.pushManager.getSubscription();
   setPushButton(existing ? "subscribed" : "idle");
 
