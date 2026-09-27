@@ -888,6 +888,19 @@ $("photo3d-toggle").addEventListener("change", async (e) => {
       scene.screenSpaceCameraController.minimumZoomDistance = 1;
       scene.screenSpaceCameraController.enableCollisionDetection = false;
       $("nav-hint").hidden = false;
+      // La caméra du globe reste souvent en vue plongeante (vue "carte",
+      // tangage proche de -90°) : sans bascule, les villes 3D s'affichent
+      // mais on continue à les regarder d'en haut au lieu d'une vue au
+      // niveau des rues façon Google Maps. On incline et on rapproche la
+      // caméra seulement si elle est encore quasi verticale.
+      if (viewer.camera.pitch < Cesium.Math.toRadians(-60)) {
+        const c = viewer.camera.positionCartographic;
+        viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromRadians(c.longitude, c.latitude, Math.min(c.height, 700)),
+          orientation: { heading: viewer.camera.heading, pitch: Cesium.Math.toRadians(-35), roll: 0 },
+          duration: 1.5,
+        });
+      }
     } else {
       disablePhoto3D();
     }
@@ -1191,10 +1204,65 @@ async function loadControl() {
 }
 $("control-toggle").addEventListener("change", loadControl);
 
+// ───────────────────────── Contrôle territorial (Yémen) ─────────────────────────
+// Polygones par district (admin2) ACAPS, pas de front quotidien comme VIINA :
+// un simple GeoJsonDataSource suffit, pas besoin d'agrégation en hexagones.
+const YEMEN_CONTROLLER_COLOR = {
+  IRG: Cesium.Color.fromCssColorString("#5b9bf0"),
+  DFA: Cesium.Color.fromCssColorString("#e0413a"),
+  STC: Cesium.Color.fromCssColorString("#4caf7d"),
+  AQAP: Cesium.Color.fromCssColorString("#8b5cf6"),
+};
+const YEMEN_UNKNOWN_COLOR = Cesium.Color.fromCssColorString("#8b95a5");
+let yemenControlSource = null;
+let yemenControlData = null;
+
+async function loadYemenControl() {
+  if (yemenControlSource) {
+    viewer.dataSources.remove(yemenControlSource, true);
+    yemenControlSource = null;
+  }
+  if (!$("yemen-control-toggle").checked) return layerStatus("yemen-control");
+  try {
+    if (!yemenControlData) {
+      const res = await fetch("/data/yemen-control.json");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      yemenControlData = await res.json();
+    }
+    const ds = await Cesium.GeoJsonDataSource.load(
+      { type: "FeatureCollection", features: yemenControlData.features },
+      { clampToGround: true },
+    );
+    for (const entity of ds.entities.values) {
+      const p = entity.properties?.getValue?.(Cesium.JulianDate.now()) || {};
+      const color = (YEMEN_CONTROLLER_COLOR[p.controller] || YEMEN_UNKNOWN_COLOR).withAlpha(0.45);
+      entity.polygon.material = color;
+      entity.polygon.outline = true;
+      entity.polygon.outlineColor = color.withAlpha(0.9);
+      panelInfo.set(entity, {
+        kind: "Contrôle territorial (Yémen)",
+        title: p.admin2 || "District",
+        badge: RELIABILITY.modeled,
+        sourceLabel: "ACAPS",
+        rows: [["Gouvernorat", p.admin1], ["Contrôle", p.controller_label], ["Données au", frDate(yemenControlData.as_of)]],
+        notes: "Zones de contrôle par district (admin2), mise à jour environ trimestrielle par ACAPS. Ce n'est pas une ligne de front quotidienne.",
+        url: yemenControlData.url,
+      });
+    }
+    viewer.dataSources.add(ds);
+    yemenControlSource = ds;
+    layerStatus("yemen-control", { count: yemenControlData.features.length, note: `au ${frDate(yemenControlData.as_of).slice(0, 5)}` });
+  } catch (err) {
+    layerStatus("yemen-control", { error: err.message });
+  }
+}
+$("yemen-control-toggle").addEventListener("change", loadYemenControl);
+
 // ───────────────────────── Démarrage ─────────────────────────
 function loadAll() {
   loadEvents();
   loadControl();
+  loadYemenControl();
   CONTEXT_LAYERS.forEach((L) => loadContextLayer(L));
 }
 

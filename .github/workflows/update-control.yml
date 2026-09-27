@@ -1,7 +1,10 @@
-name: Mise à jour du contrôle territorial (VIINA)
+name: Mise à jour du contrôle territorial (VIINA + ACAPS Yémen)
 
 # Reconstruit worker/public/data/ukraine-control.json depuis VIINA (ODbL,
 # https://github.com/zhukovyuri/VIINA, mis à jour quotidiennement) et
+# worker/public/data/yemen-control.json depuis ACAPS (CC BY, mis à jour
+# environ trimestriellement — un cron quotidien ne coûte rien de plus, le
+# job ne committe/déploie que si un fichier a réellement changé), puis
 # redéploie le Worker. Les données VIINA pèsent ~450 Mo en CSV : c'est
 # pour ça que ce traitement se fait ici plutôt que dans le Worker lui-même.
 on:
@@ -23,13 +26,16 @@ jobs:
         with:
           node-version: 22
 
-      - name: Génère le fichier de contrôle territorial
+      - name: Génère le fichier de contrôle territorial (Ukraine · VIINA)
         run: python3 worker/scripts/build_control.py
+
+      - name: Génère le fichier de contrôle territorial (Yémen · ACAPS)
+        run: python3 worker/scripts/build_yemen_control.py
 
       - name: Vérifie que le fichier a changé
         id: diff
         run: |
-          if git diff --quiet -- worker/public/data/ukraine-control.json; then
+          if git diff --quiet -- worker/public/data/ukraine-control.json worker/public/data/yemen-control.json; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -40,8 +46,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add worker/public/data/ukraine-control.json
-          git commit -m "Contrôle territorial : mise à jour automatique (VIINA)"
+          git add worker/public/data/ukraine-control.json worker/public/data/yemen-control.json
+          git commit -m "Contrôle territorial : mise à jour automatique (VIINA + ACAPS Yémen)"
           git push
 
       - name: Installe les dépendances du Worker
