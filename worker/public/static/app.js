@@ -864,6 +864,8 @@ function disablePhoto3D() {
     groundGlobeHandler = null;
   }
   scene.globe.show = true;
+  if (controlPrimitive) controlPrimitive.show = true;
+  if (yemenControlSource) yemenControlSource.show = true;
   scene.screenSpaceCameraController.minimumZoomDistance = 1;
   scene.screenSpaceCameraController.enableCollisionDetection = true;
   $("nav-hint").hidden = true;
@@ -880,7 +882,14 @@ $("photo3d-toggle").addEventListener("change", async (e) => {
       }
       photo3d.show = true;
       groundGlobeHandler = () => {
-        scene.globe.show = viewer.camera.positionCartographic.height > GROUND_ALTITUDE_M;
+        // Sous GROUND_ALTITUDE_M, les couches de contrôle territorial (
+        // polygones semi-transparents calés au sol) s'affichent très mal
+        // par-dessus le maillage photoréaliste, en larges taches sombres
+        // irrégulières — on les masque donc au niveau rue, comme le globe.
+        const aboveGround = viewer.camera.positionCartographic.height > GROUND_ALTITUDE_M;
+        scene.globe.show = aboveGround;
+        if (controlPrimitive) controlPrimitive.show = aboveGround;
+        if (yemenControlSource) yemenControlSource.show = aboveGround;
       };
       scene.preRender.addEventListener(groundGlobeHandler);
       // Zoom libre jusqu'au sol et collision désactivée : on peut se glisser
@@ -897,7 +906,7 @@ $("photo3d-toggle").addEventListener("change", async (e) => {
         const c = viewer.camera.positionCartographic;
         viewer.camera.flyTo({
           destination: Cesium.Cartesian3.fromRadians(c.longitude, c.latitude, Math.min(c.height, 700)),
-          orientation: { heading: viewer.camera.heading, pitch: Cesium.Math.toRadians(-35), roll: 0 },
+          orientation: { heading: viewer.camera.heading, pitch: Cesium.Math.toRadians(-18), roll: 0 },
           duration: 1.5,
         });
       }
@@ -911,6 +920,8 @@ $("photo3d-toggle").addEventListener("change", async (e) => {
       groundGlobeHandler = null;
     }
     scene.globe.show = true;
+    if (controlPrimitive) controlPrimitive.show = true;
+    if (yemenControlSource) yemenControlSource.show = true;
     $("status").textContent = `⚠️ Villes 3D indisponibles — ${err.message || err}`;
   }
 });
