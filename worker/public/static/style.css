@@ -70,6 +70,7 @@ body.app .topbar {
 
 .clock { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.95rem; font-weight: 500; color: var(--accent); }
 .clock small { color: var(--accent); font-weight: 500; }
+.clock-local, .clock-local small { color: var(--muted); }
 
 .pill-link {
   padding: 7px 13px;

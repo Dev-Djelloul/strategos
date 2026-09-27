@@ -1339,9 +1339,16 @@ function loadAll() {
   CONTEXT_LAYERS.forEach((L) => loadContextLayer(L));
 }
 
-// Horloge UTC
+// Horloge UTC + heure locale (fuseau du visiteur)
+const localZoneAbbr = (() => {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZoneName: "short" }).formatToParts(new Date());
+  return parts.find((p) => p.type === "timeZoneName")?.value || "";
+})();
+$("clock-local-zone").textContent = localZoneAbbr;
 function tickClock() {
-  $("clock-utc").textContent = new Date().toISOString().substring(11, 19);
+  const now = new Date();
+  $("clock-utc").textContent = now.toISOString().substring(11, 19);
+  $("clock-local").textContent = now.toLocaleTimeString("fr-FR", { hour12: false });
 }
 tickClock();
 setInterval(tickClock, 1000);
