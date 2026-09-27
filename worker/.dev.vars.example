@@ -1,6 +1,9 @@
 # Copier en .dev.vars (ignoré par git) pour `wrangler dev`.
 # En production : `wrangler secret put <NOM>`.
 CESIUM_ION_TOKEN=
-ACLED_EMAIL=
-ACLED_PASSWORD=
 UCDP_ACCESS_TOKEN=
+# Notifications Web Push : générer une paire de clés VAPID (voir la doc du
+# projet ou `web-push generate-vapid-keys`). Clé publique = safe à exposer
+# côté client (voir /config.js) ; clé privée = secret serveur uniquement.
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=

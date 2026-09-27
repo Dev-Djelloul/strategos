@@ -6,6 +6,8 @@ export interface Env {
   UCDP_ACCESS_TOKEN?: string;
   UCDP_GED_VERSION?: string;
   CESIUM_ION_TOKEN?: string;
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY?: string;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

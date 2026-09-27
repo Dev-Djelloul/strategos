@@ -12,6 +12,7 @@ import { fetchInfrastructureSites } from "./sources/infrastructure.ts";
 import { DEFAULT_SOURCES, PRIORITY, fetchConflicts } from "./conflicts.ts";
 import type { SourceKey } from "./conflicts.ts";
 import { renderMethodology } from "./methodology.ts";
+import { checkAndNotify, handleSubscribe, handleUnsubscribe } from "./push.ts";
 
 const json = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), {
@@ -36,8 +37,14 @@ function parseQuery(url: URL, defaultDays: number, maxDays = 90) {
   return { days, eventType, country };
 }
 
-async function handleApi(url: URL, env: Env, ctx: Ctx): Promise<Response> {
+async function handleApi(url: URL, env: Env, ctx: Ctx, request: Request): Promise<Response> {
   switch (url.pathname) {
+    case "/api/push/subscribe":
+      if (request.method !== "POST") return json({ detail: "POST requis" }, 405);
+      return handleSubscribe(request, env);
+    case "/api/push/unsubscribe":
+      if (request.method !== "POST") return json({ detail: "POST requis" }, 405);
+      return handleUnsubscribe(request, env);
     case "/api/filters":
       return json({
         event_types: Object.keys(EVENT_TYPE_MAP),
@@ -74,8 +81,13 @@ export default {
     const url = new URL(request.url);
     try {
       if (url.pathname === "/config.js") {
-        // Token Cesium Ion injecté côté page (jeton public de type navigateur, restreint côté Cesium).
-        return new Response(`window.CESIUM_ION_TOKEN = ${JSON.stringify(env.CESIUM_ION_TOKEN ?? "")};\n`, {
+        // Token Cesium Ion et clé publique VAPID (Web Push) : deux valeurs
+        // publiques par nature (restreintes côté Cesium / usage exclusivement
+        // en clé de vérification côté serveur de push), sûres à exposer.
+        const body =
+          `window.CESIUM_ION_TOKEN = ${JSON.stringify(env.CESIUM_ION_TOKEN ?? "")};\n` +
+          `window.VAPID_PUBLIC_KEY = ${JSON.stringify(env.VAPID_PUBLIC_KEY ?? "")};\n`;
+        return new Response(body, {
           headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" },
         });
       }
@@ -84,7 +96,7 @@ export default {
           headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
         });
       }
-      if (url.pathname.startsWith("/api/")) return await handleApi(url, env, ctx);
+      if (url.pathname.startsWith("/api/")) return await handleApi(url, env, ctx, request);
     } catch (e) {
       const status = e instanceof WarmingUp ? 503 : 500;
       return json({ detail: errMessage(e) }, status);
@@ -104,6 +116,7 @@ export default {
       ["nucléaire", fetchNuclearSites(env, ctx, WAIT)],
       ["militaire", fetchMilitarySites(env, ctx, WAIT)],
       ["infrastructures", fetchInfrastructureSites(env, ctx, WAIT)],
+      ["notifications", checkAndNotify(env, ctx).then((r) => console.log(`push: ${r.notified} abonné(s) notifié(s), ${r.newEvents} nouvel(aux) événement(s)`))],
     ];
     const results = await Promise.allSettled(jobs.map(([, p]) => p));
     results.forEach((r, i) => log(jobs[i][0])(r));

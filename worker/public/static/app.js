@@ -1416,6 +1416,66 @@ async function pollLiveFeed() {
 pollLiveFeed();
 setInterval(pollLiveFeed, LIVE_POLL_MS);
 
+// ───────────────────────── Notifications Web Push ─────────────────────────
+// Alerte même l'onglet en arrière-plan (ou le navigateur fermé, sur les
+// plateformes qui le permettent) quand un nouvel événement apparaît — le fil
+// "Nouveaux événements" ci-dessus ne fonctionne, lui, que page ouverte.
+const vapidPublicKey = window.VAPID_PUBLIC_KEY || "";
+function urlBase64ToUint8Array(base64url) {
+  const base64 = (base64url + "=".repeat((4 - (base64url.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
+async function setPushButton(state) {
+  const btn = $("push-toggle");
+  const status = $("push-status");
+  if (state === "unsupported") {
+    btn.disabled = true;
+    btn.textContent = "🔕 Notifications non disponibles";
+    status.textContent = "Ce navigateur ne prend pas en charge les notifications push.";
+  } else if (state === "denied") {
+    btn.disabled = true;
+    btn.textContent = "🔕 Notifications bloquées";
+    status.textContent = "Autorise les notifications pour ce site dans les réglages du navigateur.";
+  } else if (state === "subscribed") {
+    btn.textContent = "🔕 Désactiver les notifications";
+    status.textContent = "Tu seras notifié quand un nouvel événement apparaît, même onglet en arrière-plan.";
+  } else {
+    btn.textContent = "🔔 Activer les notifications";
+    status.textContent = "";
+  }
+}
+
+async function initPush() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !vapidPublicKey) return setPushButton("unsupported");
+  if (Notification.permission === "denied") return setPushButton("denied");
+  const reg = await navigator.serviceWorker.register("/sw.js");
+  const existing = await reg.pushManager.getSubscription();
+  setPushButton(existing ? "subscribed" : "idle");
+
+  $("push-toggle").addEventListener("click", async () => {
+    try {
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) {
+        await fetch("/api/push/unsubscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(sub) }).catch(() => {});
+        await sub.unsubscribe();
+        setPushButton("idle");
+        return;
+      }
+      const perm = await Notification.requestPermission();
+      if (perm !== "granted") return setPushButton(perm === "denied" ? "denied" : "idle");
+      const newSub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) });
+      const res = await fetch("/api/push/subscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(newSub) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setPushButton("subscribed");
+    } catch (err) {
+      $("push-status").textContent = `⚠️ ${err.message}`;
+    }
+  });
+}
+initPush();
+
 // ───────────────────────── Démarrage ─────────────────────────
 function loadAll() {
   loadEvents();
