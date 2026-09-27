@@ -46,14 +46,18 @@ export function renderMethodology(env: Env): string {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sources et méthodologie — Strategos</title>
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="/static/logo-mark.png" type="image/png" />
+  <link rel="apple-touch-icon" href="/static/logo-mark.png" />
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body class="doc">
   <header class="topbar">
-    <div>
-      <h1>🌍 Strategos</h1>
-      <p class="subtitle">Sources et méthodologie</p>
+    <div class="brand">
+      <img class="brand-mark" src="/static/logo-mark.png" alt="" width="28" height="28" />
+      <div>
+        <h1>Strategos</h1>
+        <p class="subtitle">Sources et méthodologie</p>
+      </div>
     </div>
     <a class="btn-secondary link-btn" href="/">← Retour au globe</a>
   </header>

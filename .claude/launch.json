@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "strategos-dev",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd worker && npx wrangler dev"],
+      "port": 8787
+    }
+  ]
+}
