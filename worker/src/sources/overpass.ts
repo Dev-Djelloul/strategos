@@ -81,3 +81,23 @@ export function queryOverpass(
     waitMs,
   );
 }
+
+/** Exécute `items` avec au plus `limit` appels concurrents.
+ *
+ * Nécessaire dès qu'on interroge Overpass par pays (une requête par région
+ * plutôt qu'une seule mondiale) : lancer toutes les requêtes d'un coup en
+ * Promise.all ouvre autant de connexions simultanées vers le même hôte, ce
+ * qui dépasse la limite de requêtes HTTP concurrentes d'un Worker — les
+ * plus anciennes sont alors annulées de force ("stalled HTTP response was
+ * canceled to prevent deadlock") avant même d'avoir une réponse. */
+export async function withConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    for (let i = next++; i < items.length; i = next++) {
+      results[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}

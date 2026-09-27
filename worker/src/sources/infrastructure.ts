@@ -8,7 +8,12 @@
  * partielles (les pays rapides répondent) plutôt que rien du tout. */
 import type { Ctx, Env, FeatureCollection } from "../types.ts";
 import { COUNTRY_BOUNDS } from "./acled.ts";
-import { queryOverpass } from "./overpass.ts";
+import { queryOverpass, withConcurrency } from "./overpass.ts";
+
+// Requêtes lancées 4 à la fois (voir withConcurrency) : toutes les lancer
+// d'un coup (30 ici : 3 catégories x 10 pays) dépasse la limite de requêtes
+// HTTP concurrentes du Worker.
+const MAX_CONCURRENT = 4;
 
 const CATEGORIES: Record<string, { label: string; ql: (bbox: string) => string }> = {
   airports: {
@@ -32,11 +37,11 @@ out center 300;`,
 
 export async function fetchInfrastructureSites(env: Env, ctx: Ctx, waitMs?: number): Promise<FeatureCollection> {
   const jobs = Object.entries(CATEGORIES).flatMap(([name, cat]) =>
-    Object.entries(COUNTRY_BOUNDS).map(([code, [west, south, east, north]]) =>
-      queryOverpass(env, ctx, cat.ql(`(${south},${west},${north},${east})`), `infra_${name}_${code}`, cat.label, waitMs),
-    ),
+    Object.entries(COUNTRY_BOUNDS).map(([code, bounds]) => ({ name, cat, code, bounds })),
   );
-  const parts = await Promise.all(jobs);
+  const parts = await withConcurrency(jobs, MAX_CONCURRENT, ({ name, cat, code, bounds: [west, south, east, north] }) =>
+    queryOverpass(env, ctx, cat.ql(`(${south},${west},${north},${east})`), `infra_${name}_${code}`, cat.label, waitMs),
+  );
   const stale = parts.filter((p) => p.stale);
   const result: FeatureCollection = {
     type: "FeatureCollection",

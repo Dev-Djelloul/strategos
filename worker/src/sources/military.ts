@@ -14,9 +14,12 @@
  *    répondre, et on obtient des données partielles plutôt que rien. */
 import type { Ctx, Env, FeatureCollection } from "../types.ts";
 import { COUNTRY_BOUNDS } from "./acled.ts";
-import { queryOverpass } from "./overpass.ts";
+import { queryOverpass, withConcurrency } from "./overpass.ts";
 
 const BASE_VALUES = ["base", "barracks", "naval_base", "airfield", "office", "depot"];
+// Requêtes par pays lancées 4 à la fois (voir withConcurrency) : toutes les
+// lancer d'un coup dépasse la limite de requêtes HTTP concurrentes du Worker.
+const MAX_CONCURRENT = 4;
 
 function queryFor(bboxClause: string): string {
   return `[out:json][timeout:50];
@@ -27,10 +30,8 @@ out center 400;`;
 }
 
 export async function fetchMilitarySites(env: Env, ctx: Ctx, waitMs?: number): Promise<FeatureCollection> {
-  const parts = await Promise.all(
-    Object.entries(COUNTRY_BOUNDS).map(([code, [west, south, east, north]]) =>
-      queryOverpass(env, ctx, queryFor(`(${south},${west},${north},${east})`), `military_${code}`, "Site militaire", waitMs),
-    ),
+  const parts = await withConcurrency(Object.entries(COUNTRY_BOUNDS), MAX_CONCURRENT, ([code, [west, south, east, north]]) =>
+    queryOverpass(env, ctx, queryFor(`(${south},${west},${north},${east})`), `military_${code}`, "Site militaire", waitMs),
   );
   const stale = parts.filter((p) => p.stale);
   const result: FeatureCollection = {

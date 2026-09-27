@@ -856,6 +856,20 @@ if (!ionToken) {
   $("photo3d-toggle").disabled = true;
   $("photo3d-toggle").parentElement.title = "Nécessite un token Cesium Ion";
 }
+
+function disablePhoto3D() {
+  if (photo3d) photo3d.show = false;
+  if (groundGlobeHandler) {
+    scene.preRender.removeEventListener(groundGlobeHandler);
+    groundGlobeHandler = null;
+  }
+  scene.globe.show = true;
+  scene.screenSpaceCameraController.minimumZoomDistance = 1;
+  scene.screenSpaceCameraController.enableCollisionDetection = true;
+  $("nav-hint").hidden = true;
+  $("photo3d-toggle").checked = false;
+}
+
 $("photo3d-toggle").addEventListener("change", async (e) => {
   try {
     if (e.target.checked) {
@@ -875,15 +889,7 @@ $("photo3d-toggle").addEventListener("change", async (e) => {
       scene.screenSpaceCameraController.enableCollisionDetection = false;
       $("nav-hint").hidden = false;
     } else {
-      if (photo3d) photo3d.show = false;
-      if (groundGlobeHandler) {
-        scene.preRender.removeEventListener(groundGlobeHandler);
-        groundGlobeHandler = null;
-      }
-      scene.globe.show = true;
-      scene.screenSpaceCameraController.minimumZoomDistance = 1;
-      scene.screenSpaceCameraController.enableCollisionDetection = true;
-      $("nav-hint").hidden = true;
+      disablePhoto3D();
     }
   } catch (err) {
     e.target.checked = false;
@@ -894,6 +900,25 @@ $("photo3d-toggle").addEventListener("change", async (e) => {
     scene.globe.show = true;
     $("status").textContent = `⚠️ Villes 3D indisponibles — ${err.message || err}`;
   }
+});
+
+// Le maillage Google (Cesium3DTileset) ne s'affiche pas correctement hors du
+// mode Globe (3D) : en vue Planisphère/Colombus, il devient noir ou ne se
+// détaille plus en zoomant. On le désactive donc dès qu'on quitte le mode
+// 3D, et on bloque le bouton pour éviter de le rallumer dans un mode où il
+// ne peut de toute façon pas fonctionner correctement.
+scene.morphStart.addEventListener((_transitioner, _previousMode, newMode) => {
+  const is3D = newMode === Cesium.SceneMode.SCENE3D;
+  if (!is3D && $("photo3d-toggle").checked) {
+    disablePhoto3D();
+    $("status").textContent = "Villes 3D photoréalistes désactivées : disponibles uniquement en mode Globe (3D).";
+  }
+  $("photo3d-toggle").disabled = !ionToken || !is3D;
+  $("photo3d-toggle").parentElement.title = !ionToken
+    ? "Nécessite un token Cesium Ion"
+    : !is3D
+      ? "Disponible uniquement en mode Globe (3D)"
+      : "";
 });
 
 // Déplacement au sol façon "marche" (WASD/ZQSD + flèches) : utile pour
