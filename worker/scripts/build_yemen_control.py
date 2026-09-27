@@ -5,24 +5,20 @@ https://data.humdata.org/dataset/yemen-areas-of-control).
 
 Contrairement à VIINA (Ukraine), il n'y a pas de front quotidien : ACAPS
 publie un polygone par district (admin2) toutes les ~12 semaines. Le fichier
-n'est distribué qu'au format Shapefile — d'où le mini lecteur SHP/DBF ci-
-dessous (bibliothèque standard uniquement, même choix que build_control.py).
-
-Limite du lecteur SHP : chaque anneau (« part ») d'un polygone est exporté
-comme un polygone séparé d'un MultiPolygon, sans distinguer contour externe
-et trou. Sans conséquence pour les formes réelles de ce jeu de données
-(quasi toutes des polygones simples ou multi-parties sans trou).
+n'est distribué qu'au format Shapefile — d'où shp_reader.py (bibliothèque
+standard uniquement, même choix que build_control.py).
 
 Usage : python3 scripts/build_yemen_control.py
 Sans dépendance externe (bibliothèque standard uniquement).
 """
 import datetime
 import json
-import struct
 import tempfile
 import urllib.request
 import zipfile
 from pathlib import Path
+
+from shp_reader import read_dbf, read_shp
 
 HDX_PACKAGE = "https://data.humdata.org/api/3/action/package_show?id=yemen-areas-of-control"
 OUT = Path(__file__).resolve().parents[1] / "public" / "data" / "yemen-control.json"
@@ -50,57 +46,6 @@ def latest_shp_resource() -> dict:
     if not resources:
         raise SystemExit("Aucune ressource SHP trouvée dans le dataset ACAPS.")
     return max(resources, key=lambda r: r["created"])
-
-
-def read_dbf(data: bytes) -> list[dict]:
-    """Lecteur DBF minimal (champs texte/numériques usuels des shapefiles HDX)."""
-    n_records, header_len, record_len = struct.unpack_from("<I H H", data, 4)
-    fields = []
-    pos = 32
-    while data[pos] != 0x0D:
-        name = data[pos : pos + 11].split(b"\x00")[0].decode("ascii")
-        length = data[pos + 16]
-        fields.append((name, length))
-        pos += 32
-    records = []
-    pos = header_len
-    for _ in range(n_records):
-        row = data[pos : pos + record_len]
-        pos += record_len
-        if row[0:1] == b"*":  # enregistrement supprimé
-            continue
-        rec, off = {}, 1
-        for name, length in fields:
-            rec[name] = row[off : off + length].decode("latin-1").strip()
-            off += length
-        records.append(rec)
-    return records
-
-
-def read_shp(data: bytes) -> list[list[list[list[float]]]]:
-    """Lecteur SHP minimal : ne gère que le type 5 (Polygon), seul type
-    utilisé par ce dataset. Renvoie, par enregistrement, une liste d'anneaux
-    (chacun une liste de points [lon, lat])."""
-    shapes = []
-    pos = 100  # en-tête fichier fixe
-    while pos < len(data):
-        _rec_num, content_len = struct.unpack_from(">II", data, pos)
-        content_start = pos + 8
-        shape_type = struct.unpack_from("<I", data, content_start)[0]
-        rings: list[list[list[float]]] = []
-        if shape_type == 5:
-            num_parts, num_points = struct.unpack_from("<ii", data, content_start + 36)
-            parts_off = content_start + 44
-            points_off = parts_off + 4 * num_parts
-            parts = list(struct.unpack_from(f"<{num_parts}i", data, parts_off)) + [num_points]
-            points = struct.unpack_from(f"<{2 * num_points}d", data, points_off)
-            for i in range(num_parts):
-                start, end = parts[i], parts[i + 1]
-                ring = [[points[2 * j], points[2 * j + 1]] for j in range(start, end)]
-                rings.append(ring)
-        shapes.append(rings)
-        pos = content_start + content_len * 2  # content_len en mots de 16 bits
-    return shapes
 
 
 def main() -> None:

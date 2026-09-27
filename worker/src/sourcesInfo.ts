@@ -128,6 +128,15 @@ export const CONTROL_SOURCES = [
     note:
       "Polygone de contrôle par district (admin2 : IRG, gouvernement internationalement reconnu, ou DFA, autorités de facto/Ansar Allah). Recherché mais non trouvé pour les autres conflits suivis (Mali, Iran, Soudan, Syrie, Afghanistan, Irak) : les sources disponibles n'ont ni méthodologie déclarée ni licence de réutilisation.",
   },
+  {
+    name: "Contrôle territorial (Cisjordanie)",
+    provider: "OCHA — Territoire palestinien occupé (oPt)",
+    url: "https://data.humdata.org/dataset/state-of-palestine-other-0-0-0-0-0",
+    freshness: "Statique — classification légale inchangée depuis les accords d'Oslo (1995), fichier source de 2015",
+    license: "Conditions HDX spécifiques (« Other »), non une licence CC standard",
+    note:
+      "Zones A (contrôle palestinien), B (mixte), C (contrôle israélien), secteurs H1/H2 d'Hébron et Jérusalem-Est. Ce n'est PAS une ligne de front actuelle : c'est le découpage légal des accords d'Oslo, resté inchangé depuis. Cisjordanie uniquement — Gaza n'est pas couvert : le seul jeu de données structuré trouvé (« Gaza Strip Buffer Area ») date du 19/10/2023, la zone tampon d'avant l'expansion du contrôle militaire israélien pendant la guerre en cours ; l'afficher comme contrôle « actuel » aurait été trompeur.",
+  },
 ];
 
 export const BASEMAP_CREDITS: [string, string][] = [

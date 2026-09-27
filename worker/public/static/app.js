@@ -866,6 +866,7 @@ function disablePhoto3D() {
   scene.globe.show = true;
   if (controlPrimitive) controlPrimitive.show = true;
   if (yemenControlSource) yemenControlSource.show = true;
+  if (westbankControlSource) westbankControlSource.show = true;
   scene.screenSpaceCameraController.minimumZoomDistance = 1;
   scene.screenSpaceCameraController.enableCollisionDetection = true;
   $("nav-hint").hidden = true;
@@ -890,6 +891,7 @@ $("photo3d-toggle").addEventListener("change", async (e) => {
         scene.globe.show = aboveGround;
         if (controlPrimitive) controlPrimitive.show = aboveGround;
         if (yemenControlSource) yemenControlSource.show = aboveGround;
+        if (westbankControlSource) westbankControlSource.show = aboveGround;
       };
       scene.preRender.addEventListener(groundGlobeHandler);
       // Zoom libre jusqu'au sol et collision désactivée : on peut se glisser
@@ -922,6 +924,7 @@ $("photo3d-toggle").addEventListener("change", async (e) => {
     scene.globe.show = true;
     if (controlPrimitive) controlPrimitive.show = true;
     if (yemenControlSource) yemenControlSource.show = true;
+    if (westbankControlSource) westbankControlSource.show = true;
     $("status").textContent = `⚠️ Villes 3D indisponibles — ${err.message || err}`;
   }
 });
@@ -1269,11 +1272,70 @@ async function loadYemenControl() {
 }
 $("yemen-control-toggle").addEventListener("change", loadYemenControl);
 
+// ───────────────────────── Contrôle territorial (Cisjordanie) ─────────────────────────
+// Classification légale des accords d'Oslo (1995) — statique, pas un front qui
+// évolue. Ne couvre que la Cisjordanie : aucune source fiable et à jour n'a
+// été trouvée pour Gaza (voir build_westbank_control.py et la méthodologie).
+const WESTBANK_ZONE_COLOR = {
+  A: Cesium.Color.fromCssColorString("#4c9be8"),
+  H1: Cesium.Color.fromCssColorString("#4c9be8"),
+  B: Cesium.Color.fromCssColorString("#f0a020"),
+  C: Cesium.Color.fromCssColorString("#e0413a"),
+  H2: Cesium.Color.fromCssColorString("#e0413a"),
+  "ISRAELI DECLARED EAST JERUSALEM": Cesium.Color.fromCssColorString("#8b5cf6"),
+  "NO MAN'S LAND": Cesium.Color.fromCssColorString("#8b95a5"),
+};
+const WESTBANK_UNKNOWN_COLOR = Cesium.Color.fromCssColorString("#8b95a5");
+let westbankControlSource = null;
+let westbankControlData = null;
+
+async function loadWestBankControl() {
+  if (westbankControlSource) {
+    viewer.dataSources.remove(westbankControlSource, true);
+    westbankControlSource = null;
+  }
+  if (!$("westbank-control-toggle").checked) return layerStatus("westbank-control");
+  try {
+    if (!westbankControlData) {
+      const res = await fetch("/data/westbank-control.json");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      westbankControlData = await res.json();
+    }
+    const ds = await Cesium.GeoJsonDataSource.load(
+      { type: "FeatureCollection", features: westbankControlData.features },
+      { clampToGround: true },
+    );
+    for (const entity of ds.entities.values) {
+      const p = entity.properties?.getValue?.(Cesium.JulianDate.now()) || {};
+      const color = (WESTBANK_ZONE_COLOR[p.zone] || WESTBANK_UNKNOWN_COLOR).withAlpha(0.45);
+      entity.polygon.material = color;
+      entity.polygon.outline = true;
+      entity.polygon.outlineColor = color.withAlpha(0.9);
+      panelInfo.set(entity, {
+        kind: "Contrôle territorial (Cisjordanie)",
+        title: p.zone_label || "Zone",
+        badge: RELIABILITY.modeled,
+        sourceLabel: "OCHA (oPt)",
+        rows: [["Données au", frDate(westbankControlData.as_of)]],
+        notes: westbankControlData.note,
+        url: westbankControlData.url,
+      });
+    }
+    viewer.dataSources.add(ds);
+    westbankControlSource = ds;
+    layerStatus("westbank-control", { count: westbankControlData.features.length, note: `au ${frDate(westbankControlData.as_of).slice(0, 5)}` });
+  } catch (err) {
+    layerStatus("westbank-control", { error: err.message });
+  }
+}
+$("westbank-control-toggle").addEventListener("change", loadWestBankControl);
+
 // ───────────────────────── Démarrage ─────────────────────────
 function loadAll() {
   loadEvents();
   loadControl();
   loadYemenControl();
+  loadWestBankControl();
   CONTEXT_LAYERS.forEach((L) => loadContextLayer(L));
 }
 

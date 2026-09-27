@@ -1,10 +1,12 @@
-name: Mise à jour du contrôle territorial (VIINA + ACAPS Yémen)
+name: Mise à jour du contrôle territorial (VIINA + ACAPS Yémen + OCHA Cisjordanie)
 
 # Reconstruit worker/public/data/ukraine-control.json depuis VIINA (ODbL,
-# https://github.com/zhukovyuri/VIINA, mis à jour quotidiennement) et
+# https://github.com/zhukovyuri/VIINA, mis à jour quotidiennement),
 # worker/public/data/yemen-control.json depuis ACAPS (CC BY, mis à jour
-# environ trimestriellement — un cron quotidien ne coûte rien de plus, le
-# job ne committe/déploie que si un fichier a réellement changé), puis
+# environ trimestriellement) et worker/public/data/westbank-control.json
+# depuis OCHA-oPt (classification légale des accords d'Oslo, statique — ne
+# changera normalement jamais, gardé ici par cohérence avec les deux autres ;
+# le job ne committe/déploie que si un fichier a réellement changé), puis
 # redéploie le Worker. Les données VIINA pèsent ~450 Mo en CSV : c'est
 # pour ça que ce traitement se fait ici plutôt que dans le Worker lui-même.
 on:
@@ -32,10 +34,13 @@ jobs:
       - name: Génère le fichier de contrôle territorial (Yémen · ACAPS)
         run: python3 worker/scripts/build_yemen_control.py
 
+      - name: Génère le fichier de contrôle territorial (Cisjordanie · OCHA)
+        run: python3 worker/scripts/build_westbank_control.py
+
       - name: Vérifie que le fichier a changé
         id: diff
         run: |
-          if git diff --quiet -- worker/public/data/ukraine-control.json worker/public/data/yemen-control.json; then
+          if git diff --quiet -- worker/public/data/ukraine-control.json worker/public/data/yemen-control.json worker/public/data/westbank-control.json; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -46,8 +51,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add worker/public/data/ukraine-control.json worker/public/data/yemen-control.json
-          git commit -m "Contrôle territorial : mise à jour automatique (VIINA + ACAPS Yémen)"
+          git add worker/public/data/ukraine-control.json worker/public/data/yemen-control.json worker/public/data/westbank-control.json
+          git commit -m "Contrôle territorial : mise à jour automatique (VIINA + ACAPS Yémen + OCHA Cisjordanie)"
           git push
 
       - name: Installe les dépendances du Worker
