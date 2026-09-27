@@ -48,6 +48,9 @@ export function renderMethodology(env: Env): string {
   <title>Sources et méthodologie — Strategos</title>
   <link rel="icon" href="/static/logo-mark.png" type="image/png" />
   <link rel="apple-touch-icon" href="/static/logo-mark.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700&family=JetBrains+Mono:wght@500&display=swap" />
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body class="doc">
