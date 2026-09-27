@@ -44,7 +44,13 @@ async function queryMirrors(queryQl: string): Promise<{ elements?: OsmElement[];
     try {
       const res = await fetch(url, {
         method: "POST",
-        headers: { "User-Agent": USER_AGENT },
+        // overpass-api.de renvoie 406 depuis avril 2026 aux clients sans
+        // Accept / Accept-Encoding explicites (durcissement anti-bot).
+        headers: {
+          "User-Agent": USER_AGENT,
+          Accept: "application/json",
+          "Accept-Encoding": "gzip",
+        },
         body: new URLSearchParams({ data: queryQl }),
         signal: AbortSignal.timeout(70000), // une instance qui ne répond pas ne bloque pas les autres
       });
