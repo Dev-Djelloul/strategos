@@ -4,10 +4,15 @@
 
 Le fichier de contrôle territorial de l'année pèse ~25 Mo compressé (~450 Mo
 en CSV, Git LFS) : trop lourd pour un Worker, d'où ce traitement séparé
-(exécutable à la main ou par une tâche planifiée). Le résultat est un petit
-fichier statique : les localités actuellement sous contrôle russe ou
-contesté, plus celles qui ont changé de main dans la fenêtre récente, avec
-la date du dernier changement.
+(exécutable à la main, ou automatiquement via .github/workflows/update-control.yml).
+Le résultat est un petit fichier statique : les localités actuellement sous
+contrôle russe ou contesté, plus celles qui ont changé de main dans la
+fenêtre récente, avec la date du changement et le statut précédent (pour
+que le globe puisse rejouer l'évolution avec la timeline).
+
+Limite : seul le DERNIER changement de chaque localité est gardé. Une
+localité qui a changé de main plusieurs fois dans la fenêtre affichera donc
+un statut approximatif pour les dates antérieures à cet ultime changement.
 
 Usage : python3 scripts/build_control.py [--year 2026] [--window 90]
 Sans dépendance externe (bibliothèque standard uniquement).
@@ -61,7 +66,7 @@ def main() -> None:
             latest = max(latest, date)
             prev = status.get(gid)
             if prev is not None and prev != st:
-                changed[gid] = date
+                changed[gid] = (date, prev)
             status[gid] = st
     as_of = datetime.datetime.strptime(latest, "%Y%m%d").date()
     cutoff = (as_of - datetime.timedelta(days=args.window)).strftime("%Y%m%d")
@@ -71,7 +76,7 @@ def main() -> None:
         p = feat["properties"]
         gid = str(int(p["geonameid"]))
         st = status.get(gid)
-        ch = changed.get(gid, "")
+        ch, prev_st = changed.get(gid, ("", None))
         recent = ch >= cutoff if ch else False
         # On garde ce qui n'est pas déjà "évident" : zones russes/contestées
         # et changements récents (même si la localité est redevenue ukrainienne).
@@ -79,6 +84,7 @@ def main() -> None:
             places.append([
                 round(p["longitude"], 4), round(p["latitude"], 4), st,
                 int(ch) if recent else 0, p.get("asciiname") or p.get("name"), p.get("ADM1_NAME"),
+                prev_st if recent else None,
             ])
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
@@ -89,7 +95,7 @@ def main() -> None:
         "as_of": as_of.isoformat(),
         "generated": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
         "window_days": args.window,
-        "fields": ["lon", "lat", "status(R|C|U)", "changed(YYYYMMDD|0)", "name", "admin1"],
+        "fields": ["lon", "lat", "status(R|C|U)", "changed(YYYYMMDD|0)", "name", "admin1", "prevStatus(R|C|U|null)"],
         "places": places,
     }
     OUT.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")

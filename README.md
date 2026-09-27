@@ -137,13 +137,22 @@ la collecte GDELT ; le plan Workers Paid est recommandé.
 ## Mettre à jour le contrôle territorial
 
 Le fichier `worker/public/data/ukraine-control.json` est un instantané produit
-hors du Worker (les données VIINA pèsent ~450 Mo en CSV) :
+hors du Worker (les données VIINA pèsent ~450 Mo en CSV), **automatisé** par
+`.github/workflows/update-control.yml` : tous les jours à 05:00 UTC, il
+régénère le fichier, le committe s'il a changé, puis redéploie le Worker.
+
+Nécessite le secret de dépôt GitHub `CLOUDFLARE_API_TOKEN` (jeton avec accès
+"Edit Cloudflare Workers"). Déclenchement manuel possible depuis l'onglet
+Actions du dépôt (`workflow_dispatch`). Pour relancer à la main :
 
 ```bash
 cd worker && python3 scripts/build_control.py   # puis npx wrangler deploy
 ```
 
-À automatiser plus tard (tâche planifiée). Attribution VIINA obligatoire (ODbL).
+Attribution VIINA obligatoire (ODbL). Le contrôle territorial est branché sur
+la timeline : à une date antérieure au dernier changement d'une localité,
+son statut précédent est utilisé (seul le tout dernier changement de chaque
+localité est conservé — voir la remarque dans `scripts/build_control.py`).
 
 ## Roadmap
 

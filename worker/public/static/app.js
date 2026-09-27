@@ -202,7 +202,11 @@ clickHandler.setInputAction((click) => {
   const picked = scene.pick(click.position);
   if (!Cesium.defined(picked)) return hideSidePanel();
   const id = picked.id;
-  const info = id instanceof Cesium.Entity ? panelInfo.get(id) : id?.panel;
+  const info = id instanceof Cesium.Entity
+    ? panelInfo.get(id)
+    : id?.controlCell
+      ? controlPanel(id, controlDateCompact(state.cutoff))
+      : id?.panel;
   if (info) showSidePanel(info);
   else hideSidePanel();
 }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
@@ -512,6 +516,7 @@ function stopPlayback() {
 function applyTimeline() {
   if (!timelineStart) {
     state.cutoff = null;
+    updateControlColors();
     return;
   }
   const day = new Date(timelineStart.getTime() + Number(slider.value) * 86400000).toISOString().slice(0, 10);
@@ -519,14 +524,19 @@ function applyTimeline() {
   $("timeline-label").textContent = `jusqu'au ${frDate(day)}`;
   cancelAnimationFrame(sliderRaf);
   sliderRaf = requestAnimationFrame(() => renderConflicts());
+  updateControlColors();
 }
 
 function setupTimeline() {
   stopPlayback();
-  if (!state.events.some((f) => f.properties.event_date)) {
+  // La timeline reste utile même sans conflit daté tant que le contrôle
+  // territorial (qui a ses propres dates de changement) est actif.
+  const hasControlHistory = $("control-toggle").checked && controlCells.some((c) => c.localities.some((l) => l.changed));
+  if (!state.events.some((f) => f.properties.event_date) && !hasControlHistory) {
     timelineStart = null;
     timelineEl.hidden = true;
     state.cutoff = null;
+    updateControlColors();
     return;
   }
   const end = new Date();
@@ -1003,74 +1013,133 @@ CONTEXT_LAYERS.forEach((L) => $(`${L.key}-toggle`).addEventListener("change", ()
 
 // ───────────────────────── Contrôle territorial (Ukraine) ─────────────────────────
 // Estimation VIINA agrégée en hexagones H3 posés au sol : teinte selon le
-// statut dominant, plus vive là où une localité a changé de main récemment.
+// statut dominant. Branché sur la timeline : à une date antérieure au
+// dernier changement d'une localité, son statut PRÉCÉDENT est utilisé (le
+// fichier ne garde que le tout dernier changement de chaque localité dans
+// la fenêtre ; un lieu qui a changé de main plusieurs fois affichera donc
+// une approximation avant ce dernier changement — voir méthodologie).
+const CONTROL_RES = 5;
+const CONTROL_COLOR = {
+  R: Cesium.Color.fromCssColorString("#e0413a"),
+  C: Cesium.Color.fromCssColorString("#f0a020"),
+  U: Cesium.Color.fromCssColorString("#4c9be8"), // libéré (visible seulement près de la date du changement)
+};
 let controlPrimitive = null;
 let controlData = null;
-const CONTROL_RES = 5;
+let controlCells = []; // { id (objet = clé d'attribut Cesium), lat, lon, admin1, localities }
+const controlDateCompact = (cutoff) => (cutoff ? cutoff.replaceAll("-", "") : null);
+
+/** Statut d'une localité à une date donnée : son statut précédent si son
+ * (unique) changement connu est postérieur au cutoff, sinon son statut actuel. */
+function localityStatusAt(loc, cutoffCompact) {
+  if (cutoffCompact && loc.changed && String(loc.changed) > cutoffCompact && loc.prevStatus) return loc.prevStatus;
+  return loc.status;
+}
+
+function cellStateAt(cell, cutoffCompact) {
+  const s = { R: 0, C: 0, U: 0, changes: [] };
+  for (const loc of cell.localities) {
+    s[localityStatusAt(loc, cutoffCompact)]++;
+    if (loc.changed && (!cutoffCompact || String(loc.changed) <= cutoffCompact)) s.changes.push(loc);
+  }
+  return s;
+}
+
+function cellColor(s) {
+  const hasRecent = s.changes.length > 0;
+  if (s.R >= s.C && s.R > 0) return CONTROL_COLOR.R.withAlpha(hasRecent ? 0.62 : 0.4);
+  if (s.C > 0) return CONTROL_COLOR.C.withAlpha(0.55);
+  return CONTROL_COLOR.U.withAlpha(0.5);
+}
+
+function controlPanel(cell, cutoffCompact) {
+  const s = cellStateAt(cell, cutoffCompact);
+  return {
+    kind: "Contrôle territorial (Ukraine)",
+    title: s.R >= s.C && s.R > 0 ? "Zone sous contrôle russe" : s.C > 0 ? "Zone contestée" : "Zone récemment libérée",
+    badge: RELIABILITY.modeled,
+    sourceLabel: "VIINA 2.0",
+    rows: [["Région", cell.admin1], ["Localités sous contrôle russe", s.R || null], ["Localités contestées", s.C || null], ["Données au", frDate(controlData.as_of)]],
+    itemsTitle: "Changements de main",
+    items: s.changes.sort((a, b) => b.changed - a.changed).slice(0, 8).map((r) => ({
+      title: r.name,
+      meta: `${r.status === "R" ? "passée sous contrôle russe" : r.status === "C" ? "devenue contestée" : "libérée"} · ${String(r.changed).replace(/(\d{4})(\d{2})(\d{2})/, "$3/$2/$1")}`,
+    })),
+    notes: "Estimation par vote entre plusieurs sources (DeepStateMap, ISW, Wikipédia, presse), agrégée en hexagones de ~17 km. Ce n'est pas une ligne de front officielle.",
+    url: controlData.url,
+    lon: cell.lon, lat: cell.lat, zoomRange: 60000,
+  };
+}
 
 function buildControl(data) {
-  const cells = new Map();
-  for (const [lon, lat, st, changed, name, admin1] of data.places) {
-    const cell = h3.latLngToCell(lat, lon, CONTROL_RES);
-    let c = cells.get(cell);
-    if (!c) cells.set(cell, (c = { cell, R: 0, C: 0, U: 0, recent: [], admin1 }));
-    c[st]++;
-    if (changed > 0) c.recent.push({ name, changed, st });
+  const grouped = new Map();
+  for (const [lon, lat, status, changed, name, admin1, prevStatus] of data.places) {
+    const cellId = h3.latLngToCell(lat, lon, CONTROL_RES);
+    let c = grouped.get(cellId);
+    if (!c) grouped.set(cellId, (c = { cellId, admin1, localities: [] }));
+    c.localities.push({ status, changed: changed || 0, prevStatus: prevStatus || null, name });
   }
+
+  controlCells = [];
   const instances = [];
-  for (const c of cells.values()) {
-    const positions = cellPolygon(c.cell);
+  for (const c of grouped.values()) {
+    const positions = cellPolygon(c.cellId);
     if (!positions) continue;
-    const hasRecent = c.recent.length > 0;
-    let color;
-    if (c.R >= c.C && c.R > 0) color = Cesium.Color.fromCssColorString("#e0413a").withAlpha(hasRecent ? 0.62 : 0.4);
-    else if (c.C > 0) color = Cesium.Color.fromCssColorString("#f0a020").withAlpha(0.55);
-    else color = Cesium.Color.fromCssColorString("#4c9be8").withAlpha(0.5); // libéré récemment
-    const [lat, lon] = h3.cellToLatLng(c.cell);
+    const [lat, lon] = h3.cellToLatLng(c.cellId);
+    const cell = { admin1: c.admin1, localities: c.localities, lat, lon, controlCell: true };
+    controlCells.push(cell);
     instances.push(new Cesium.GeometryInstance({
-      geometry: new Cesium.PolygonGeometry({ polygonHierarchy: new Cesium.PolygonHierarchy(positions), vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT }),
-      attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(color) },
-      id: {
-        panel: {
-          kind: "Contrôle territorial (Ukraine)",
-          title: c.R >= c.C && c.R > 0 ? "Zone sous contrôle russe" : c.C > 0 ? "Zone contestée" : "Zone récemment libérée",
-          badge: RELIABILITY.modeled,
-          sourceLabel: "VIINA 2.0",
-          rows: [["Région", c.admin1], ["Localités sous contrôle russe", c.R || null], ["Localités contestées", c.C || null], ["Données au", frDate(data.as_of)]],
-          itemsTitle: "Changements de main récents",
-          items: c.recent.sort((a, b) => b.changed - a.changed).slice(0, 8).map((r) => ({
-            title: r.name,
-            meta: `${r.st === "R" ? "passée sous contrôle russe" : r.st === "C" ? "devenue contestée" : "libérée"} · ${String(r.changed).replace(/(\d{4})(\d{2})(\d{2})/, "$3/$2/$1")}`,
-          })),
-          notes: "Estimation par vote entre plusieurs sources (DeepStateMap, ISW, Wikipédia, presse), agrégée en hexagones de ~17 km. Ce n'est pas une ligne de front officielle.",
-          url: data.url,
-          lon, lat, zoomRange: 60000,
-        },
-      },
+      geometry: new Cesium.PolygonGeometry({
+        polygonHierarchy: new Cesium.PolygonHierarchy(positions),
+        height: 80, // légèrement au-dessus du relief : évite le z-fighting sans "flotter" visiblement
+        vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT,
+      }),
+      attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(cellColor(cellStateAt(cell, null))) },
+      id: cell, // même référence réutilisée pour les mises à jour de couleur et le clic
     }));
   }
-  return new Cesium.GroundPrimitive({
+  // Un GroundPrimitive (drapé sur le vrai relief) attend que le terrain se
+  // charge pour devenir "ready" - ça peut ne jamais aboutir en pratique.
+  // On préfère donc un polygone plat classique, légèrement surélevé pour
+  // éviter le z-fighting avec le relief, comme pour les colonnes d'événements.
+  return new Cesium.Primitive({
     geometryInstances: instances,
     appearance: new Cesium.PerInstanceColorAppearance({ flat: true, translucent: true }),
-    classificationType: Cesium.ClassificationType.TERRAIN,
     asynchronous: false,
   });
 }
 
+/** Recolore les hexagones existants pour une date donnée, sans reconstruire
+ * la géométrie (appelé à chaque déplacement du curseur de la timeline). */
+function updateControlColors() {
+  if (!controlPrimitive?.ready || !controlCells.length) return;
+  const cutoffCompact = controlDateCompact(state.cutoff);
+  for (const cell of controlCells) {
+    const attrs = controlPrimitive.getGeometryInstanceAttributes(cell);
+    if (attrs) attrs.color = Cesium.ColorGeometryInstanceAttribute.toValue(cellColor(cellStateAt(cell, cutoffCompact)), attrs.color);
+  }
+}
+
 async function loadControl() {
   if (controlPrimitive) {
-    scene.groundPrimitives.remove(controlPrimitive);
+    scene.primitives.remove(controlPrimitive);
     controlPrimitive = null;
+    controlCells = [];
   }
-  if (!$("control-toggle").checked) return layerStatus("control");
+  if (!$("control-toggle").checked) {
+    setupTimeline();
+    return layerStatus("control");
+  }
   try {
     if (!controlData) {
       const res = await fetch("/data/ukraine-control.json");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       controlData = await res.json();
     }
-    controlPrimitive = scene.groundPrimitives.add(buildControl(controlData));
+    controlPrimitive = scene.primitives.add(buildControl(controlData));
     layerStatus("control", { count: controlData.places.length, note: `au ${frDate(controlData.as_of).slice(0, 5)}` });
+    setupTimeline(); // le contrôle territorial peut à lui seul justifier d'afficher la timeline
+    updateControlColors(); // reflète un curseur déjà déplacé avant que cette couche ne charge
   } catch (err) {
     layerStatus("control", { error: err.message });
   }
