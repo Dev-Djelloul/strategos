@@ -845,7 +845,13 @@ $("daynight-toggle").addEventListener("change", (e) => {
 });
 
 // Villes 3D photoréalistes (maillage Google via Cesium Ion), chargées à la demande.
+// Le globe n'est masqué qu'en dessous de GROUND_ALTITUDE_M : au-delà (vue
+// région/monde), le maillage Google n'est de toute façon pas chargé à cette
+// résolution, et masquer le globe en permanence faisait disparaître le fond
+// (imagerie + effet jour/nuit) dès qu'on dézoomait, laissant l'écran noir.
+const GROUND_ALTITUDE_M = 4000;
 let photo3d = null;
+let groundGlobeHandler = null;
 if (!ionToken) {
   $("photo3d-toggle").disabled = true;
   $("photo3d-toggle").parentElement.title = "Nécessite un token Cesium Ion";
@@ -859,7 +865,10 @@ $("photo3d-toggle").addEventListener("change", async (e) => {
         scene.primitives.add(photo3d);
       }
       photo3d.show = true;
-      scene.globe.show = false;
+      groundGlobeHandler = () => {
+        scene.globe.show = viewer.camera.positionCartographic.height > GROUND_ALTITUDE_M;
+      };
+      scene.preRender.addEventListener(groundGlobeHandler);
       // Zoom libre jusqu'au sol et collision désactivée : on peut se glisser
       // entre les bâtiments plutôt que d'être bloqué à distance.
       scene.screenSpaceCameraController.minimumZoomDistance = 1;
@@ -867,6 +876,10 @@ $("photo3d-toggle").addEventListener("change", async (e) => {
       $("nav-hint").hidden = false;
     } else {
       if (photo3d) photo3d.show = false;
+      if (groundGlobeHandler) {
+        scene.preRender.removeEventListener(groundGlobeHandler);
+        groundGlobeHandler = null;
+      }
       scene.globe.show = true;
       scene.screenSpaceCameraController.minimumZoomDistance = 1;
       scene.screenSpaceCameraController.enableCollisionDetection = true;
@@ -874,6 +887,10 @@ $("photo3d-toggle").addEventListener("change", async (e) => {
     }
   } catch (err) {
     e.target.checked = false;
+    if (groundGlobeHandler) {
+      scene.preRender.removeEventListener(groundGlobeHandler);
+      groundGlobeHandler = null;
+    }
     scene.globe.show = true;
     $("status").textContent = `⚠️ Villes 3D indisponibles — ${err.message || err}`;
   }
@@ -895,8 +912,11 @@ addEventListener("keyup", (e) => pressedMoves.delete(MOVE_KEYS[e.key.toLowerCase
 addEventListener("blur", () => pressedMoves.clear());
 scene.preRender.addEventListener(() => {
   if (!pressedMoves.size) return;
-  // Vitesse proportionnelle à l'altitude : rapide en vol, fine au sol entre les bâtiments.
-  const speed = Math.max(1.5, viewer.camera.positionCartographic.height * 0.06);
+  // Vitesse proportionnelle à l'altitude (rapide en vol, fine au sol entre les
+  // bâtiments), plafonnée : sans plafond, une pression de touche en vue globe
+  // (altitude ~10-20 000 km) projetait la caméra à des millions de mètres par
+  // frame, hors du champ en un instant.
+  const speed = Math.min(20000, Math.max(1.5, viewer.camera.positionCartographic.height * 0.06));
   if (pressedMoves.has("fwd")) viewer.camera.moveForward(speed);
   if (pressedMoves.has("back")) viewer.camera.moveBackward(speed);
   if (pressedMoves.has("left")) viewer.camera.moveLeft(speed);
