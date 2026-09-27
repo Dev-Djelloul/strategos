@@ -677,6 +677,132 @@ async function loadFilters() {
   }
 }
 
+// ───────────────────────── Recherche de lieux ─────────────────────────
+// Cherche d'abord dans nos régions et pays (instantané), sinon interroge
+// Nominatim/OpenStreetMap (gratuit, sans clé) et cadre le résultat.
+const searchForm = $("search-form");
+const searchInput = $("search-input");
+const searchResults = $("search-results");
+const searchStatus = $("search-status");
+let searchAbort = null;
+
+function localMatches(q) {
+  const needle = q.toLowerCase();
+  const out = [];
+  REGIONS.forEach((r, i) => {
+    if (r.name.toLowerCase().includes(needle)) out.push({ label: r.name, detail: "Région suivie", action: () => selectRegion(i) });
+  });
+  [...$("country").options].forEach((opt) => {
+    if (opt.value && opt.textContent.toLowerCase().includes(needle)) {
+      out.push({ label: opt.textContent, detail: "Pays suivi — filtre les conflits", action: () => selectCountry(opt.value) });
+    }
+  });
+  return out;
+}
+
+function selectRegion(i) {
+  $("region").value = String(i);
+  const r = REGIONS[i];
+  viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(Cesium.Cartesian3.fromDegrees(r.lon, r.lat, 0), r.range / 4), {
+    duration: 2.5,
+    offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(r.pitch ?? -40), r.range),
+  });
+}
+
+function selectCountry(code) {
+  $("country").value = code;
+  $("country").dispatchEvent(new Event("change"));
+}
+
+function flyToPlace(place) {
+  const range = place.bboxRange || 120000;
+  viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(Cesium.Cartesian3.fromDegrees(place.lon, place.lat, 0), range / 4), {
+    duration: 2.5,
+    offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-45), range),
+  });
+}
+
+async function remoteMatches(q) {
+  searchAbort?.abort();
+  searchAbort = new AbortController();
+  const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q=${encodeURIComponent(q)}`;
+  const res = await fetch(url, { signal: searchAbort.signal, headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const rows = await res.json();
+  return rows.map((r) => {
+    const [s, n, w, e] = r.boundingbox.map(Number);
+    const span = Cesium.Cartesian3.distance(Cesium.Cartesian3.fromDegrees(w, s, 0), Cesium.Cartesian3.fromDegrees(e, n, 0));
+    return {
+      label: r.display_name.split(",")[0],
+      detail: r.display_name,
+      lon: Number(r.lon), lat: Number(r.lat),
+      bboxRange: Math.max(span * 1.4, 2000),
+      action: null,
+    };
+  });
+}
+
+function renderSearchResults(items) {
+  searchResults.innerHTML = items.map((it, i) => `<li tabindex="0" data-i="${i}"><b>${escapeHtml(it.label)}</b><span>${escapeHtml(it.detail || "")}</span></li>`).join("");
+  searchResults.hidden = items.length === 0;
+  searchResults._items = items;
+}
+
+searchResults.addEventListener("click", (e) => {
+  const li = e.target.closest("li[data-i]");
+  if (!li) return;
+  const item = searchResults._items[Number(li.dataset.i)];
+  if (item.action) item.action();
+  else flyToPlace(item);
+  searchResults.hidden = true;
+  searchInput.blur();
+});
+
+let searchDebounce = null;
+searchInput.addEventListener("input", () => {
+  clearTimeout(searchDebounce);
+  const q = searchInput.value.trim();
+  if (q.length < 2) {
+    searchResults.hidden = true;
+    return;
+  }
+  const local = localMatches(q);
+  if (local.length) renderSearchResults(local);
+  searchDebounce = setTimeout(async () => {
+    try {
+      const remote = await remoteMatches(q);
+      renderSearchResults([...local, ...remote].slice(0, 8));
+      searchStatus.textContent = "";
+    } catch (err) {
+      if (err.name !== "AbortError") searchStatus.textContent = `Recherche indisponible (${err.message})`;
+    }
+  }, 350);
+});
+
+searchForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const q = searchInput.value.trim();
+  if (!q) return;
+  const items = searchResults._items;
+  if (items?.length) return items[0].action ? items[0].action() : flyToPlace(items[0]);
+  searchStatus.textContent = "Recherche…";
+  try {
+    const remote = await remoteMatches(q);
+    if (!remote.length) {
+      searchStatus.textContent = "Aucun résultat.";
+      return;
+    }
+    flyToPlace(remote[0]);
+    renderSearchResults(remote);
+    searchStatus.textContent = "";
+  } catch (err) {
+    searchStatus.textContent = `Recherche indisponible (${err.message})`;
+  }
+});
+document.addEventListener("click", (e) => {
+  if (!searchForm.contains(e.target) && !searchResults.contains(e.target)) searchResults.hidden = true;
+});
+
 $("period").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-days]");
   if (!b) return;
@@ -719,19 +845,52 @@ $("photo3d-toggle").addEventListener("change", async (e) => {
     if (e.target.checked) {
       if (!photo3d) {
         photo3d = await Cesium.createGooglePhotorealistic3DTileset();
+        photo3d.maximumScreenSpaceError = 4; // détail fin au niveau rue
         scene.primitives.add(photo3d);
       }
       photo3d.show = true;
       scene.globe.show = false;
+      // Zoom libre jusqu'au sol et collision désactivée : on peut se glisser
+      // entre les bâtiments plutôt que d'être bloqué à distance.
+      scene.screenSpaceCameraController.minimumZoomDistance = 1;
+      scene.screenSpaceCameraController.enableCollisionDetection = false;
+      $("nav-hint").hidden = false;
     } else {
       if (photo3d) photo3d.show = false;
       scene.globe.show = true;
+      scene.screenSpaceCameraController.minimumZoomDistance = 1;
+      scene.screenSpaceCameraController.enableCollisionDetection = true;
+      $("nav-hint").hidden = true;
     }
   } catch (err) {
     e.target.checked = false;
     scene.globe.show = true;
     $("status").textContent = `⚠️ Villes 3D indisponibles — ${err.message || err}`;
   }
+});
+
+// Déplacement au sol façon "marche" (WASD/ZQSD + flèches) : utile pour
+// parcourir les rues en villes 3D, mais actif partout sur le globe.
+const MOVE_KEYS = { z: "fwd", w: "fwd", arrowup: "fwd", s: "back", arrowdown: "back", q: "left", a: "left", arrowleft: "left", d: "right", arrowright: "right" };
+const pressedMoves = new Set();
+function isTypingTarget(el) {
+  return el && (el.tagName === "INPUT" || el.tagName === "SELECT" || el.tagName === "TEXTAREA");
+}
+addEventListener("keydown", (e) => {
+  const move = MOVE_KEYS[e.key.toLowerCase()];
+  if (!move || isTypingTarget(document.activeElement)) return;
+  pressedMoves.add(move);
+});
+addEventListener("keyup", (e) => pressedMoves.delete(MOVE_KEYS[e.key.toLowerCase()]));
+addEventListener("blur", () => pressedMoves.clear());
+scene.preRender.addEventListener(() => {
+  if (!pressedMoves.size) return;
+  // Vitesse proportionnelle à l'altitude : rapide en vol, fine au sol entre les bâtiments.
+  const speed = Math.max(1.5, viewer.camera.positionCartographic.height * 0.06);
+  if (pressedMoves.has("fwd")) viewer.camera.moveForward(speed);
+  if (pressedMoves.has("back")) viewer.camera.moveBackward(speed);
+  if (pressedMoves.has("left")) viewer.camera.moveLeft(speed);
+  if (pressedMoves.has("right")) viewer.camera.moveRight(speed);
 });
 
 // Panneau de contrôle repliable (utile surtout sur mobile).

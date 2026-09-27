@@ -27,6 +27,15 @@
   </header>
 
   <aside id="controls" class="controls glass">
+    <section class="card search-card">
+      <form id="search-form" class="search-row" autocomplete="off">
+        <input id="search-input" type="search" placeholder="Rechercher un lieu, un pays, une ville…" aria-label="Rechercher un lieu" />
+        <button type="submit" class="icon-btn" aria-label="Rechercher">🔍</button>
+      </form>
+      <ul id="search-results" class="search-results" hidden></ul>
+      <p id="search-status" class="fineprint"></p>
+    </section>
+
     <section class="card view-card">
       <div class="card-head"><h2>Dans la vue</h2><span id="vs-scope" class="muted">Monde entier</span></div>
       <div class="stats">
@@ -115,6 +124,7 @@
         <input type="checkbox" class="switch" id="photo3d-toggle" />
         <span class="row-main">Villes 3D photoréalistes</span>
       </label>
+      <p id="nav-hint" class="nav-hint" hidden>Déplacement au sol : <kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> ou <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> pour avancer/tourner, molette pour zoomer, glisser pour regarder autour.</p>
       <label class="row" title="Ombre du soleil en temps réel (la face nocturne est sombre)">
         <input type="checkbox" class="switch" id="daynight-toggle" />
         <span class="row-main">Jour / nuit en temps réel</span>

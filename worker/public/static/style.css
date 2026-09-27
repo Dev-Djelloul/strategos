@@ -415,3 +415,60 @@ body.doc .subtitle { margin: 3px 0 0; color: var(--muted); font-size: 0.82rem; }
   .timeline { right: 12px; }
   .legend { bottom: 92px; }
 }
+
+/* ───────── Recherche de lieux ───────── */
+.search-row { display: flex; gap: 6px; }
+.search-row input {
+  flex: 1;
+  padding: 9px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+.search-row input::placeholder { color: var(--muted); }
+.search-row .icon-btn { width: 38px; height: 38px; flex: none; }
+.search-results {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.search-results[hidden] { display: none; }
+.search-results li {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--raised);
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+.search-results li:hover, .search-results li:focus-visible { border-color: rgba(255, 255, 255, 0.25); }
+.search-results li b { display: block; font-weight: 600; }
+.search-results li span { color: var(--muted); font-size: 0.74rem; }
+
+/* Info navigation 3D (villes photoréalistes) */
+.nav-hint {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--raised);
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+.nav-hint[hidden] { display: none; }
+.nav-hint kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--border);
+  font-size: 0.68rem;
+  font-family: inherit;
+}
