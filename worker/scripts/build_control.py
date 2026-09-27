@@ -5,10 +5,11 @@
 Le fichier de contrôle territorial de l'année pèse ~25 Mo compressé (~450 Mo
 en CSV, Git LFS) : trop lourd pour un Worker, d'où ce traitement séparé
 (exécutable à la main, ou automatiquement via .github/workflows/update-control.yml).
-Le résultat est un petit fichier statique : les localités actuellement sous
-contrôle russe ou contesté, plus celles qui ont changé de main dans la
-fenêtre récente, avec la date du changement et le statut précédent (pour
-que le globe puisse rejouer l'évolution avec la timeline).
+Le résultat est un fichier statique listant toutes les localités connues de
+VIINA (~33 000), avec leur statut (russe, contesté, ukrainien), la date du
+dernier changement de main et le statut précédent (pour que le globe puisse
+rejouer l'évolution avec la timeline et colorier tout le territoire, pas
+seulement le front).
 
 Limite : seul le DERNIER changement de chaque localité est gardé. Une
 localité qui a changé de main plusieurs fois dans la fenêtre affichera donc
@@ -78,9 +79,11 @@ def main() -> None:
         st = status.get(gid)
         ch, prev_st = changed.get(gid, ("", None))
         recent = ch >= cutoff if ch else False
-        # On garde ce qui n'est pas déjà "évident" : zones russes/contestées
-        # et changements récents (même si la localité est redevenue ukrainienne).
-        if st in ("R", "C") or recent:
+        # Toutes les localités connues de VIINA sont gardées (y compris "U",
+        # tenues par l'Ukraine) pour que le globe puisse colorier tout le
+        # territoire, comme pour le Yémen — pas seulement les zones russes/
+        # contestées/récemment changées.
+        if st is not None:
             places.append([
                 round(p["longitude"], 4), round(p["latitude"], 4), st,
                 int(ch) if recent else 0, p.get("asciiname") or p.get("name"), p.get("ADM1_NAME"),
