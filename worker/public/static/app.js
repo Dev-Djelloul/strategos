@@ -1330,6 +1330,92 @@ async function loadWestBankControl() {
 }
 $("westbank-control-toggle").addEventListener("change", loadWestBankControl);
 
+// ───────────────────────── Fil en direct + résumé du jour ─────────────────────────
+// Indépendant des filtres de la carte (période/pays/zone visible choisis par
+// l'utilisateur) : toujours dernières 24 h, monde entier, sources qualifiées
+// + presse — pour répondre à "qu'est-ce qui vient de se passer", pas à "que
+// vois-je en ce moment sur la carte" (déjà couvert par "Dans la vue").
+const LIVE_POLL_MS = 3 * 60 * 1000;
+const LIVE_FEED_MAX = 30;
+const seenEventKeys = new Set();
+let liveFeedItems = [];
+let firstLivePoll = true;
+
+const eventKey = (f) => {
+  const [lon, lat] = f.geometry.coordinates;
+  const p = f.properties;
+  return `${p.event_date}|${p.event_type}|${lon.toFixed(2)}|${lat.toFixed(2)}`;
+};
+
+function renderDailySummary(features) {
+  let fat = 0, verified = 0;
+  const byType = {};
+  for (const f of features) {
+    const p = f.properties;
+    if (p.confidence !== "press") {
+      verified++;
+      fat += p.fatalities || 0;
+    }
+    byType[p.event_type] = (byType[p.event_type] || 0) + 1;
+  }
+  $("daily-events").textContent = features.length.toLocaleString("fr-FR");
+  $("daily-fat").textContent = fat.toLocaleString("fr-FR");
+  $("daily-verified").textContent = verified.toLocaleString("fr-FR");
+  const max = Math.max(1, ...Object.values(byType));
+  $("daily-types").innerHTML = Object.entries(byType)
+    .sort((a, b) => b[1] - a[1])
+    .map(([t, n]) => `<div class="type-bar"><span>${escapeHtml(EVENT_TYPE_LABELS[t] || t)}</span><span>${n}</span>
+      <div class="track"><div class="fill" style="width:${(n / max) * 100}%;background:${EVENT_TYPE_COLORS[t] || "#e2463b"}"></div></div></div>`)
+    .join("");
+}
+
+function renderLiveFeed() {
+  $("live-badge").hidden = liveFeedItems.length === 0;
+  $("live-badge").textContent = String(liveFeedItems.length);
+  $("live-feed").innerHTML = liveFeedItems
+    .map((f, i) => {
+      const p = f.properties;
+      const meta = [EVENT_TYPE_LABELS[p.event_type] || p.event_type, p.event_date ? frDate(p.event_date) : null].filter(Boolean).join(" · ");
+      return `<li data-i="${i}"><b>${escapeHtml(p.name || "Événement")}</b><span>${escapeHtml(meta)}</span></li>`;
+    })
+    .join("");
+}
+$("live-feed").addEventListener("click", (e) => {
+  const li = e.target.closest("li[data-i]");
+  const f = li && liveFeedItems[Number(li.dataset.i)];
+  if (f) flyToPoint(...f.geometry.coordinates, 400000);
+});
+
+async function pollLiveFeed() {
+  try {
+    const data = await apiJson("/api/conflicts?days=1&event_type=all&sources=ucdp,gdelt");
+    const features = data.features || [];
+    const nowStr = new Date().toLocaleTimeString("fr-FR");
+    if (firstLivePoll) {
+      features.forEach((f) => seenEventKeys.add(eventKey(f)));
+      firstLivePoll = false;
+      $("live-status").textContent = `Suivi démarré à ${nowStr} — les événements à venir apparaîtront ici.`;
+    } else {
+      const fresh = features.filter((f) => !seenEventKeys.has(eventKey(f)));
+      features.forEach((f) => seenEventKeys.add(eventKey(f)));
+      if (fresh.length) {
+        liveFeedItems = [...fresh, ...liveFeedItems].slice(0, LIVE_FEED_MAX);
+        renderLiveFeed();
+      }
+      $("live-status").textContent = fresh.length
+        ? `${fresh.length} nouveau${fresh.length > 1 ? "x" : ""} événement${fresh.length > 1 ? "s" : ""} détecté${fresh.length > 1 ? "s" : ""} à ${nowStr}.`
+        : `Aucun nouvel événement — vérifié à ${nowStr}.`;
+    }
+    renderDailySummary(features);
+    $("daily-status").textContent = `Mis à jour à ${nowStr}.`;
+  } catch (err) {
+    $("live-status").textContent = `⚠️ ${err.message}`;
+    $("daily-status").textContent = `⚠️ ${err.message}`;
+  }
+}
+pollLiveFeed();
+setInterval(pollLiveFeed, LIVE_POLL_MS);
+
 // ───────────────────────── Démarrage ─────────────────────────
 function loadAll() {
   loadEvents();

@@ -56,6 +56,23 @@
     </section>
 
     <section class="card">
+      <div class="card-head"><h2>Résumé du jour</h2><span class="muted">Dernières 24 h · monde entier</span></div>
+      <div class="stats">
+        <div><b id="daily-events">–</b><span>événements</span></div>
+        <div><b id="daily-fat">–</b><span>victimes<sup>*</sup></span></div>
+        <div><b id="daily-verified">–</b><span>qualifiés</span></div>
+      </div>
+      <div id="daily-types" class="type-bars"></div>
+      <p id="daily-status" class="fineprint">Chargement…</p>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>Nouveaux événements <span id="live-badge" class="live-badge" hidden>0</span></h2><span class="muted">Depuis l'ouverture</span></div>
+      <ul id="live-feed" class="search-results live-feed"></ul>
+      <p id="live-status" class="fineprint">Chargement…</p>
+    </section>
+
+    <section class="card">
       <div class="card-head"><h2>Période</h2></div>
       <div class="segmented" id="period" role="group" aria-label="Période">
         <button data-days="1">24 h</button>
