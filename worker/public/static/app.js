@@ -1029,7 +1029,10 @@ scene.morphStart.addEventListener((_transitioner, _previousMode, newMode) => {
 
 // Déplacement au sol façon "marche" (WASD/ZQSD + flèches) : utile pour
 // parcourir les rues en villes 3D, mais actif partout sur le globe.
-const MOVE_KEYS = { z: "fwd", w: "fwd", arrowup: "fwd", s: "back", arrowdown: "back", q: "left", a: "left", arrowleft: "left", d: "right", arrowright: "right" };
+// Q/D (ou ←/→) tournent la caméra sur elle-même (comme dans un jeu à la
+// première personne) plutôt que de translater latéralement — on peut déjà
+// glisser la souris pour ça, la disparité clavier/souris n'avait pas de sens.
+const MOVE_KEYS = { z: "fwd", w: "fwd", arrowup: "fwd", s: "back", arrowdown: "back", q: "turnleft", a: "turnleft", arrowleft: "turnleft", d: "turnright", arrowright: "turnright" };
 const pressedMoves = new Set();
 function isTypingTarget(el) {
   return el && (el.tagName === "INPUT" || el.tagName === "SELECT" || el.tagName === "TEXTAREA");
@@ -1048,10 +1051,11 @@ scene.preRender.addEventListener(() => {
   // (altitude ~10-20 000 km) projetait la caméra à des millions de mètres par
   // frame, hors du champ en un instant.
   const speed = Math.min(20000, Math.max(1.5, viewer.camera.positionCartographic.height * 0.06));
+  const turnSpeed = Cesium.Math.toRadians(1.6);
   if (pressedMoves.has("fwd")) viewer.camera.moveForward(speed);
   if (pressedMoves.has("back")) viewer.camera.moveBackward(speed);
-  if (pressedMoves.has("left")) viewer.camera.moveLeft(speed);
-  if (pressedMoves.has("right")) viewer.camera.moveRight(speed);
+  if (pressedMoves.has("turnleft")) viewer.camera.lookLeft(turnSpeed);
+  if (pressedMoves.has("turnright")) viewer.camera.lookRight(turnSpeed);
 });
 
 // Panneau de contrôle repliable (utile surtout sur mobile).
