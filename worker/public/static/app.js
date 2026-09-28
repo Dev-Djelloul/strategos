@@ -967,6 +967,11 @@ $("photo3d-toggle").addEventListener("change", async (e) => {
         if (controlPrimitive) controlPrimitive.show = aboveGround;
         if (yemenControlSource) yemenControlSource.show = aboveGround;
         if (westbankControlSource) westbankControlSource.show = aboveGround;
+        // Le maillage Google ne couvre pas les océans (ni les zones sans
+        // relevé récent) : ses tuiles s'y affichent en noir plat. Vu de loin
+        // il n'apporte de toute façon rien par rapport à l'imagerie normale
+        // du globe — on ne le garde visible qu'au niveau rue.
+        photo3d.show = !aboveGround;
       };
       scene.preRender.addEventListener(groundGlobeHandler);
       // Zoom libre jusqu'au sol et collision désactivée : on peut se glisser
