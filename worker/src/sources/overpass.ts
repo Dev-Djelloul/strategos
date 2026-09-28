@@ -16,13 +16,28 @@ interface OsmElement {
   lat?: number;
   lon?: number;
   center?: { lat: number; lon: number };
+  geometry?: { lat: number; lon: number }[];
   tags?: Record<string, string>;
+}
+
+/** Moyenne des sommets d'un tracé (way) : pour une forme allongée (barrage,
+ * jetée...), plus fidèle que le centre de sa boîte englobante — celui-ci
+ * peut tomber hors de la structure dès qu'elle n'est pas droite/rectangulaire
+ * (ex. un barrage en diagonale, dont le centre de la boîte tombe dans l'eau). */
+function centroid(points: { lat: number; lon: number }[]): { lat: number; lon: number } {
+  let sumLat = 0;
+  let sumLon = 0;
+  for (const pt of points) {
+    sumLat += pt.lat;
+    sumLon += pt.lon;
+  }
+  return { lat: sumLat / points.length, lon: sumLon / points.length };
 }
 
 function toGeoJson(elements: OsmElement[], nameFallback: string): FeatureCollection {
   const features: Feature[] = [];
   for (const el of elements) {
-    const p = el.type === "node" ? el : el.center;
+    const p = el.type === "node" ? el : el.geometry?.length ? centroid(el.geometry) : el.center;
     if (p?.lat === undefined || p?.lon === undefined) continue;
     const tags = el.tags ?? {};
     features.push({

@@ -26,7 +26,7 @@ function queryFor(bboxClause: string): string {
 (
   ${BASE_VALUES.map((v) => `nwr["military"="${v}"]["name"]${bboxClause};`).join("\n  ")}
 );
-out center 400;`;
+out geom 400;`;
 }
 
 export async function fetchMilitarySites(env: Env, ctx: Ctx, waitMs?: number): Promise<FeatureCollection> {
