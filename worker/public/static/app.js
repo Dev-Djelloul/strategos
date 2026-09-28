@@ -40,16 +40,15 @@ const viewer = new Cesium.Viewer("cesiumContainer", {
   terrainProvider,
 });
 
+// Labels + frontières seuls (pas de routes : la référence Esri
+// "World_Transportation" était épaisse, jaune et peu lisible, et inutile
+// sur un globe de conflits — on ne garde que les noms de pays/villes).
+// Note : CARTO propose un rendu plus élégant (dark_only_labels) mais exige
+// désormais une clé API au-delà d'un faible niveau de zoom en accès anonyme
+// (tuile "API KEY REQUIRED" constatée en test) — non viable sans compte payant.
 viewer.imageryLayers.addImageryProvider(
   new Cesium.UrlTemplateImageryProvider({
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
-    credit: "Esri",
-    maximumLevel: 19,
-  })
-);
-viewer.imageryLayers.addImageryProvider(
-  new Cesium.UrlTemplateImageryProvider({
-    url: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
     credit: "Esri",
     maximumLevel: 19,
   })
