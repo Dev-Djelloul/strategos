@@ -301,6 +301,16 @@ body.sp-open .legend { right: calc(var(--side-w) + 24px); }
 body.controls-hidden .timeline-wrap { left: 12px; }
 body.sp-open .timeline-wrap { right: calc(var(--side-w) + 226px); }
 
+.timeline-reopen {
+  position: fixed;
+  z-index: 15;
+  bottom: 34px;
+  left: calc(var(--panel-w) + 36px);
+  transition: left 0.25s ease;
+}
+.timeline-reopen[hidden] { display: none; }
+body.controls-hidden .timeline-reopen { left: 12px; }
+
 .timeline {
   padding: 8px 14px;
   display: flex;

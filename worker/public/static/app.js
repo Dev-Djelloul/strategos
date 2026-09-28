@@ -517,6 +517,24 @@ let timelineTimer = null;
 let sliderRaf = 0;
 let dayEvents = []; // dayEvents[i] = événements du (timelineStart + i jours), pour l'histogramme et le journal
 let lastJournalIdx = -1;
+// Masquage manuel par l'utilisateur (bouton ✕) : persiste tant qu'il ne la
+// rouvre pas explicitement, même si les données sous-jacentes rechargent.
+let timelineUserHidden = false;
+$("timeline-close").addEventListener("click", () => {
+  timelineUserHidden = true;
+  stopPlayback();
+  timelineEl.hidden = true;
+  journalEl.hidden = true;
+  $("timeline-reopen").hidden = false;
+});
+$("timeline-reopen").addEventListener("click", () => {
+  timelineUserHidden = false;
+  if (timelineStart) {
+    timelineEl.hidden = false;
+    journalEl.hidden = false;
+  }
+  $("timeline-reopen").hidden = true;
+});
 
 function stopPlayback() {
   clearInterval(timelineTimer);
@@ -546,7 +564,7 @@ function renderJournal(fromIdx, toIdx) {
   for (let i = Math.max(0, fromIdx); i <= toIdx; i++) events.push(...dayEvents[i]);
   const day = new Date(timelineStart.getTime() + toIdx * 86400000).toISOString().slice(0, 10);
   const spanning = toIdx > fromIdx;
-  journalEl.hidden = false;
+  journalEl.hidden = timelineUserHidden;
   $("tj-date").textContent = spanning ? `${frDate(new Date(timelineStart.getTime() + fromIdx * 86400000).toISOString().slice(0, 10))} → ${frDate(day)}` : frDate(day);
   $("tj-count").textContent = events.length ? `${events.length} événement${events.length > 1 ? "s" : ""}` : "";
   journalItems = events.length
@@ -599,6 +617,7 @@ function setupTimeline() {
     timelineStart = null;
     timelineEl.hidden = true;
     journalEl.hidden = true;
+    $("timeline-reopen").hidden = true;
     state.cutoff = null;
     updateControlColors();
     return;
@@ -608,7 +627,8 @@ function setupTimeline() {
   timelineStart = new Date(end.getTime() - state.days * 86400000);
   slider.max = String(state.days);
   slider.value = String(state.days);
-  timelineEl.hidden = false;
+  timelineEl.hidden = timelineUserHidden;
+  $("timeline-reopen").hidden = !timelineUserHidden;
 
   dayEvents = Array.from({ length: state.days + 1 }, () => []);
   for (const f of state.events) {
