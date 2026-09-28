@@ -180,10 +180,19 @@
     </div>
   </div>
 
-  <div class="timeline glass" id="timeline" hidden>
-    <button id="timeline-play" class="icon-btn" title="Lecture / pause">▶</button>
-    <input type="range" id="timeline-slider" min="0" max="0" value="0" aria-label="Date affichée" />
-    <span id="timeline-label" class="timeline-label"></span>
+  <div class="timeline-wrap" id="timeline-wrap" hidden>
+    <div class="timeline-journal glass" id="timeline-journal" hidden>
+      <div class="tj-head"><span id="tj-date">—</span><span id="tj-count" class="muted"></span></div>
+      <ul id="tj-list"></ul>
+    </div>
+    <div class="timeline glass" id="timeline">
+      <button id="timeline-play" class="icon-btn" title="Lecture / pause">▶</button>
+      <div class="timeline-track">
+        <div id="timeline-hist" class="timeline-hist" aria-hidden="true"></div>
+        <input type="range" id="timeline-slider" min="0" max="0" value="0" aria-label="Date affichée" />
+      </div>
+      <span id="timeline-label" class="timeline-label"></span>
+    </div>
   </div>
 
   <aside id="side-panel" class="side-panel glass" aria-live="polite">

@@ -501,16 +501,56 @@ viewer.camera.moveEnd.addEventListener(() => {
 });
 
 // ───────────────────────── Timeline ─────────────────────────
-const timelineEl = $("timeline");
+const timelineEl = $("timeline-wrap");
+const journalEl = $("timeline-journal");
 const slider = $("timeline-slider");
 let timelineStart = null;
 let timelineTimer = null;
 let sliderRaf = 0;
+let dayEvents = []; // dayEvents[i] = événements du (timelineStart + i jours), pour l'histogramme et le journal
+let lastJournalIdx = -1;
 
 function stopPlayback() {
   clearInterval(timelineTimer);
   timelineTimer = null;
   $("timeline-play").textContent = "▶";
+}
+
+/** Petit histogramme au-dessus du curseur : une barre par jour, hauteur
+ * proportionnelle (racine carrée, pour que les jours calmes restent visibles
+ * à côté d'un pic) au nombre d'événements ce jour-là. Donne un aperçu de
+ * l'activité sur toute la période avant même d'appuyer sur lecture. */
+function renderTimelineHistogram() {
+  const max = Math.max(1, ...dayEvents.map((d) => d.length));
+  $("timeline-hist").innerHTML = dayEvents
+    .map((d) => `<span style="height:${d.length ? Math.max(10, Math.sqrt(d.length / max) * 100) : 0}%"></span>`)
+    .join("");
+}
+
+/** Journal affiché par le curseur : les événements des jours traversés
+ * depuis la dernière position (fromIdx..toIdx), pas seulement le jour
+ * d'arrivée — la lecture avance parfois de plusieurs jours par pas, on ne
+ * veut rien laisser passer silencieusement. Un simple déplacement (pas de
+ * lecture) ou un retour en arrière ne montre que le jour d'arrivée. */
+function renderJournal(fromIdx, toIdx) {
+  const events = [];
+  for (let i = Math.max(0, fromIdx); i <= toIdx; i++) events.push(...dayEvents[i]);
+  const day = new Date(timelineStart.getTime() + toIdx * 86400000).toISOString().slice(0, 10);
+  const spanning = toIdx > fromIdx;
+  journalEl.hidden = false;
+  $("tj-date").textContent = spanning ? `${frDate(new Date(timelineStart.getTime() + fromIdx * 86400000).toISOString().slice(0, 10))} → ${frDate(day)}` : frDate(day);
+  $("tj-count").textContent = events.length ? `${events.length} événement${events.length > 1 ? "s" : ""}` : "";
+  $("tj-list").innerHTML = events.length
+    ? [...events]
+        .sort((a, b) => eventWeight(b.properties) - eventWeight(a.properties))
+        .slice(0, 12)
+        .map((f) => {
+          const p = f.properties;
+          const meta = [EVENT_TYPE_LABELS[p.event_type] || p.event_type, p.fatalities ? `${p.fatalities} victimes` : null].filter(Boolean).join(" · ");
+          return `<li><b>${escapeHtml(p.name || "Événement")}</b><span>${escapeHtml(meta)}</span></li>`;
+        })
+        .join("")
+    : `<li class="tj-empty">Aucun événement recensé ce jour-là.</li>`;
 }
 
 function applyTimeline() {
@@ -519,9 +559,15 @@ function applyTimeline() {
     updateControlColors();
     return;
   }
-  const day = new Date(timelineStart.getTime() + Number(slider.value) * 86400000).toISOString().slice(0, 10);
-  state.cutoff = Number(slider.value) >= Number(slider.max) ? null : day;
+  const idx = Number(slider.value);
+  const day = new Date(timelineStart.getTime() + idx * 86400000).toISOString().slice(0, 10);
+  state.cutoff = idx >= Number(slider.max) ? null : day;
   $("timeline-label").textContent = `jusqu'au ${frDate(day)}`;
+  if (idx !== lastJournalIdx) {
+    const fromIdx = lastJournalIdx >= 0 && idx > lastJournalIdx ? lastJournalIdx + 1 : idx;
+    renderJournal(fromIdx, idx);
+    lastJournalIdx = idx;
+  }
   cancelAnimationFrame(sliderRaf);
   sliderRaf = requestAnimationFrame(() => renderConflicts());
   updateControlColors();
@@ -535,6 +581,7 @@ function setupTimeline() {
   if (!state.events.some((f) => f.properties.event_date) && !hasControlHistory) {
     timelineStart = null;
     timelineEl.hidden = true;
+    journalEl.hidden = true;
     state.cutoff = null;
     updateControlColors();
     return;
@@ -545,6 +592,16 @@ function setupTimeline() {
   slider.max = String(state.days);
   slider.value = String(state.days);
   timelineEl.hidden = false;
+
+  dayEvents = Array.from({ length: state.days + 1 }, () => []);
+  for (const f of state.events) {
+    const d = f.properties.event_date;
+    if (!d) continue;
+    const idx = Math.round((Date.parse(d) - timelineStart.getTime()) / 86400000);
+    if (idx >= 0 && idx <= state.days) dayEvents[idx].push(f);
+  }
+  renderTimelineHistogram();
+  lastJournalIdx = -1;
   applyTimeline();
 }
 
