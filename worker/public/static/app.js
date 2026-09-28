@@ -1054,8 +1054,17 @@ scene.preRender.addEventListener(() => {
   const turnSpeed = Cesium.Math.toRadians(1.6);
   if (pressedMoves.has("fwd")) viewer.camera.moveForward(speed);
   if (pressedMoves.has("back")) viewer.camera.moveBackward(speed);
-  if (pressedMoves.has("turnleft")) viewer.camera.lookLeft(turnSpeed);
-  if (pressedMoves.has("turnright")) viewer.camera.lookRight(turnSpeed);
+  if (pressedMoves.has("turnleft") || pressedMoves.has("turnright")) {
+    // lookLeft/lookRight tournent autour du "up" propre de la caméra : dès
+    // que le tangage n'est plus exactement horizontal, ce vecteur dérive de
+    // la verticale locale et la rotation devient un tour en biais (roulis
+    // qui s'accumule). En recalculant le cap depuis le repère local
+    // est-nord-haut (roll figé à 0), la rotation reste toujours à plat.
+    const delta = (pressedMoves.has("turnright") ? 1 : 0) - (pressedMoves.has("turnleft") ? 1 : 0);
+    viewer.camera.setView({
+      orientation: { heading: viewer.camera.heading + delta * turnSpeed, pitch: viewer.camera.pitch, roll: 0 },
+    });
+  }
 });
 
 // Panneau de contrôle repliable (utile surtout sur mobile).
