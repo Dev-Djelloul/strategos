@@ -195,6 +195,8 @@ select {
   font-size: 0.82rem;
 }
 select option { background: var(--panel-solid); }
+.push-countries-field { margin-top: 8px; }
+.push-countries-field select { font-size: 0.76rem; }
 
 .row { display: flex; align-items: center; gap: 10px; padding: 6px 0; cursor: pointer; }
 .row.sub { padding-left: 2px; color: var(--muted); font-size: 0.8rem; }
@@ -333,6 +335,10 @@ body.controls-hidden .timeline-reopen { left: 12px; }
 }
 .timeline-hist span { flex: 1; min-width: 1px; border-radius: 1px 1px 0 0; background: var(--accent); opacity: 0.45; }
 .timeline-hist span.tj-today { opacity: 0.85; }
+
+.trend-chart { height: 44px; display: flex; align-items: flex-end; gap: 1.5px; }
+.trend-chart span { flex: 1; min-width: 1px; border-radius: 1px 1px 0 0; background: var(--accent); opacity: 0.55; }
+.trend-chart span:hover { opacity: 0.9; }
 
 /* ───────── Journal du jour (timeline) ───────── */
 .timeline-journal {

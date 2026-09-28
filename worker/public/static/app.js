@@ -661,6 +661,40 @@ $("timeline-play").addEventListener("click", () => {
 // ───────────────────────── Chargement des conflits ─────────────────────────
 const SOURCE_DOT = { ucdp: "UCDP", gdelt: "GDELT" };
 
+/** Petit histogramme d'activité (événements/jour) sur toute la période
+ * choisie, indépendant de la timeline (visible même quand elle est masquée
+ * ou qu'il n'y a pas de date exploitable pour elle) — donne d'un coup d'œil
+ * une tendance que les seuls totaux de « Dans la vue » ne montrent pas. */
+function renderTrendChart() {
+  const days = state.days;
+  const end = new Date();
+  end.setUTCHours(0, 0, 0, 0);
+  const start = end.getTime() - days * 86400000;
+  const counts = new Array(days + 1).fill(0);
+  const fatalities = new Array(days + 1).fill(0);
+  for (const f of state.events) {
+    const d = f.properties.event_date;
+    if (!d) continue;
+    const idx = Math.round((Date.parse(d) - start) / 86400000);
+    if (idx < 0 || idx > days) continue;
+    counts[idx]++;
+    fatalities[idx] += f.properties.fatalities || 0;
+  }
+  const max = Math.max(1, ...counts);
+  $("trend-chart").innerHTML = counts
+    .map((c, i) => {
+      const day = frDate(new Date(start + i * 86400000).toISOString().slice(0, 10));
+      const title = fatalities[i] ? `${day} : ${c} événement(s), ${fatalities[i]} victimes` : `${day} : ${c} événement(s)`;
+      return `<span style="height:${c ? Math.max(8, Math.sqrt(c / max) * 100) : 0}%" title="${escapeHtml(title)}"></span>`;
+    })
+    .join("");
+  $("trend-period").textContent = `${days} j`;
+  const totalFatal = fatalities.reduce((a, b) => a + b, 0);
+  $("trend-summary").textContent = state.events.length
+    ? `${state.events.length} événement(s)${totalFatal ? ` · ${totalFatal} victimes qualifiées` : ""}`
+    : "Aucun événement sur la période.";
+}
+
 async function loadEvents() {
   $("status").textContent = "Chargement…";
   const selected = EVENT_SOURCES.filter((k) => $(`${k}-toggle`).checked);
@@ -670,6 +704,7 @@ async function loadEvents() {
     state.dataVersion = (state.dataVersion || 0) + 1;
     setupTimeline();
     renderConflicts(true);
+    renderTrendChart();
     return renderSourceAlert({}, selected);
   }
 
@@ -699,6 +734,7 @@ async function loadEvents() {
     renderSourceAlert(data.sources, selected);
     setupTimeline();
     renderConflicts(true);
+    renderTrendChart();
     const confirmed = state.events.filter((f) => f.properties.confidence === "confirmed").length;
     $("status").textContent = `${state.events.length} événement(s), dont ${confirmed} confirmé(s) — mis à jour à ${new Date().toLocaleTimeString("fr-FR")}`;
   } catch (err) {
@@ -706,6 +742,7 @@ async function loadEvents() {
     state.dataVersion = (state.dataVersion || 0) + 1;
     setupTimeline();
     renderConflicts(true);
+    renderTrendChart();
     renderSourceAlert(null, selected, err.message);
     $("status").textContent = `⚠️ Conflits indisponibles — ${err.message}`;
   }
@@ -774,6 +811,7 @@ async function loadFilters() {
     f.countries.forEach(({ code, name, bbox }) => {
       if (bbox) countryBounds[code] = bbox;
       $("country").add(new Option(name, code));
+      $("push-countries").add(new Option(name, code));
     });
     f.event_types.filter((t) => t !== "all").forEach((t) => $("event-type").add(new Option(EVENT_TYPE_LABELS[t] || t, t)));
   } catch (err) {
@@ -933,6 +971,66 @@ $("press-toggle").addEventListener("change", (e) => {
   renderConflicts(true);
 });
 $("refresh").addEventListener("click", loadAll);
+
+// ───────────────────────── Partager cette vue ─────────────────────────
+// Encode période/filtres/caméra dans l'URL : ouvrir ce lien reproduit
+// exactement la même vue (voir applySharedState, appelé une fois les
+// filtres chargés, au démarrage).
+function buildShareUrl() {
+  const c = viewer.camera;
+  const carto = c.positionCartographic;
+  const params = new URLSearchParams({
+    lon: Cesium.Math.toDegrees(carto.longitude).toFixed(4),
+    lat: Cesium.Math.toDegrees(carto.latitude).toFixed(4),
+    h: String(Math.round(carto.height)),
+    hd: String(Math.round(Cesium.Math.toDegrees(c.heading))),
+    pi: String(Math.round(Cesium.Math.toDegrees(c.pitch))),
+    d: String(state.days),
+    t: $("event-type").value,
+    src: EVENT_SOURCES.filter((k) => $(`${k}-toggle`).checked).join(","),
+    pr: state.press ? "1" : "0",
+  });
+  if ($("country").value) params.set("c", $("country").value);
+  return `${location.origin}${location.pathname}?${params}`;
+}
+$("share-view").addEventListener("click", async () => {
+  const url = buildShareUrl();
+  try {
+    await navigator.clipboard.writeText(url);
+    $("share-status").textContent = "Lien copié dans le presse-papiers !";
+  } catch {
+    $("share-status").textContent = url; // repli si le presse-papiers est inaccessible (permission, contexte non sécurisé)
+  }
+  setTimeout(() => {
+    $("share-status").textContent = "";
+  }, 5000);
+});
+
+/** Applique une vue partagée depuis l'URL (si présente) : appelé après
+ * loadFilters() pour que les <select> pays/type aient déjà leurs options. */
+function applySharedState() {
+  const p = new URLSearchParams(location.search);
+  if (!p.has("lon") || !p.has("lat")) return false;
+  const days = parseInt(p.get("d") || "30", 10);
+  $("period").querySelectorAll("button").forEach((x) => x.classList.toggle("active", Number(x.dataset.days) === days));
+  state.days = days;
+  if (p.has("c")) $("country").value = p.get("c");
+  if (p.has("t")) $("event-type").value = p.get("t");
+  const sources = (p.get("src") || "ucdp,gdelt").split(",");
+  EVENT_SOURCES.forEach((k) => ($(`${k}-toggle`).checked = sources.includes(k)));
+  const press = p.get("pr") !== "0";
+  $("press-toggle").checked = press;
+  state.press = press;
+  viewer.camera.setView({
+    destination: Cesium.Cartesian3.fromDegrees(parseFloat(p.get("lon")), parseFloat(p.get("lat")), parseFloat(p.get("h") || "1000000")),
+    orientation: {
+      heading: Cesium.Math.toRadians(parseFloat(p.get("hd") || "0")),
+      pitch: Cesium.Math.toRadians(parseFloat(p.get("pi") || "-45")),
+      roll: 0,
+    },
+  });
+  return true;
+}
 
 $("daynight-toggle").addEventListener("change", (e) => {
   scene.globe.enableLighting = e.target.checked;
@@ -1584,10 +1682,35 @@ async function setPushButton(state) {
 // même si les notifications elles-mêmes ne sont pas prises en charge/activées.
 const swRegistration = "serviceWorker" in navigator ? navigator.serviceWorker.register("/sw.js").catch(() => null) : Promise.resolve(null);
 
+// Pays suivis pour les notifications : vide = tous. Persisté pour survivre
+// aux rechargements (le <select> est repeuplé dynamiquement par loadFilters).
+function pushCountries() {
+  return [...$("push-countries").selectedOptions].map((o) => o.value);
+}
+function restorePushCountries() {
+  let saved = [];
+  try {
+    saved = JSON.parse(localStorage.getItem("push_countries") || "[]");
+  } catch {
+    /* ignore */
+  }
+  [...$("push-countries").options].forEach((o) => (o.selected = saved.includes(o.value)));
+}
+async function subscribePush(reg) {
+  const newSub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) });
+  const countries = pushCountries();
+  const body = { ...JSON.parse(JSON.stringify(newSub)), countries };
+  const res = await fetch("/api/push/subscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  localStorage.setItem("push_countries", JSON.stringify(countries));
+  return newSub;
+}
+
 async function initPush() {
   const reg = await swRegistration;
   if (!reg || !("PushManager" in window) || !vapidPublicKey) return setPushButton("unsupported");
   if (Notification.permission === "denied") return setPushButton("denied");
+  restorePushCountries();
   const existing = await reg.pushManager.getSubscription();
   setPushButton(existing ? "subscribed" : "idle");
 
@@ -1602,10 +1725,20 @@ async function initPush() {
       }
       const perm = await Notification.requestPermission();
       if (perm !== "granted") return setPushButton(perm === "denied" ? "denied" : "idle");
-      const newSub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) });
-      const res = await fetch("/api/push/subscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(newSub) });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await subscribePush(reg);
       setPushButton("subscribed");
+    } catch (err) {
+      $("push-status").textContent = `⚠️ ${err.message}`;
+    }
+  });
+  // Changer la sélection alors qu'on est déjà abonné met à jour l'abonnement
+  // existant (même endpoint : la clé KV est réécrite, pas dupliquée).
+  $("push-countries").addEventListener("change", async () => {
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) return;
+    try {
+      await subscribePush(reg);
+      $("push-status").textContent = pushCountries().length ? "Filtre mis à jour." : "Notifié pour tous les pays suivis.";
     } catch (err) {
       $("push-status").textContent = `⚠️ ${err.message}`;
     }
@@ -1636,6 +1769,9 @@ function tickClock() {
 tickClock();
 setInterval(tickClock, 1000);
 
-loadFilters().then(loadAll);
+loadFilters().then(() => {
+  applySharedState();
+  loadAll();
+});
 
 })();

@@ -32,8 +32,12 @@ const subKey = async (endpoint: string): Promise<string> => {
   return `push_sub:${[...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
 };
 
-function isValidSubscription(body: unknown): body is PushSubscription {
-  const b = body as Partial<PushSubscription> | null;
+interface StoredSubscription extends PushSubscription {
+  countries?: string[]; // vide/absent = notifié pour tous les pays suivis
+}
+
+function isValidSubscription(body: unknown): body is StoredSubscription {
+  const b = body as Partial<StoredSubscription> | null;
   return !!b && typeof b.endpoint === "string" && !!b.keys && typeof b.keys.p256dh === "string" && typeof b.keys.auth === "string";
 }
 
@@ -45,7 +49,8 @@ export async function handleSubscribe(request: Request, env: Env): Promise<Respo
     return json({ detail: "JSON invalide" }, 400);
   }
   if (!isValidSubscription(body)) return json({ detail: "Souscription invalide (endpoint/keys.p256dh/keys.auth requis)" }, 400);
-  await env.CACHE.put(await subKey(body.endpoint), JSON.stringify(body));
+  const countries = Array.isArray(body.countries) ? body.countries.filter((c): c is string => typeof c === "string") : [];
+  await env.CACHE.put(await subKey(body.endpoint), JSON.stringify({ ...body, countries }));
   return json({ ok: true });
 }
 
@@ -83,19 +88,22 @@ export async function checkAndNotify(env: Env, ctx: Ctx): Promise<{ notified: nu
 
   if (!fresh.length) return { notified: 0, newEvents: 0 };
 
-  const lead = fresh[0].properties;
-  const payload = {
-    title: fresh.length === 1 ? "Strategos — nouvel événement" : `Strategos — ${fresh.length} nouveaux événements`,
-    body: lead.name ? `${lead.name} — ${lead.event_type ?? ""}`.trim() : "Voir le globe pour les détails.",
-    url: "/",
-  };
-
   const list = await env.CACHE.list({ prefix: "push_sub:" });
   let notified = 0;
   await Promise.allSettled(
     list.keys.map(async (k) => {
-      const sub = await env.CACHE.get<PushSubscription>(k.name, "json");
+      const sub = await env.CACHE.get<PushSubscription & { countries?: string[] }>(k.name, "json");
       if (!sub) return;
+      // Abonné filtré par pays : ne compte/n'envoie que si au moins un des
+      // événements neufs concerne un de ses pays suivis.
+      const relevant = sub.countries?.length ? fresh.filter((f) => sub.countries!.includes(f.properties.country)) : fresh;
+      if (!relevant.length) return;
+      const lead = relevant[0].properties;
+      const payload = {
+        title: relevant.length === 1 ? "Strategos — nouvel événement" : `Strategos — ${relevant.length} nouveaux événements`,
+        body: lead.name ? `${lead.name} — ${lead.event_type ?? ""}`.trim() : "Voir le globe pour les détails.",
+        url: "/",
+      };
       try {
         const result = await sendWebPush(sub, payload, env.VAPID_PUBLIC_KEY as string, env.VAPID_PRIVATE_KEY as string, VAPID_SUBJECT);
         if (result.gone) await env.CACHE.delete(k.name);

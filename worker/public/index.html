@@ -61,6 +61,12 @@
     </section>
 
     <section class="card">
+      <div class="card-head"><h2>Tendance</h2><span id="trend-period" class="muted"></span></div>
+      <div id="trend-chart" class="trend-chart" aria-hidden="true"></div>
+      <p id="trend-summary" class="fineprint"></p>
+    </section>
+
+    <section class="card">
       <div class="card-head"><h2>Résumé du jour</h2><span class="muted">Dernières 24 h · monde entier</span></div>
       <div class="stats">
         <div><b id="daily-events">–</b><span>événements</span></div>
@@ -77,6 +83,10 @@
       <p id="live-status" class="fineprint">Chargement…</p>
       <button id="push-toggle" type="button" class="btn-secondary link-btn push-btn">🔔 Activer les notifications</button>
       <p id="push-status" class="fineprint"></p>
+      <label class="field push-countries-field" title="Laisse vide pour être notifié de tous les pays suivis">
+        <span>Limiter aux pays (optionnel)</span>
+        <select id="push-countries" multiple size="4"></select>
+      </label>
     </section>
 
     <section class="card">
@@ -164,6 +174,8 @@
         <input type="checkbox" class="switch" id="daynight-toggle" />
         <span class="row-main">Jour / nuit en temps réel</span>
       </label>
+      <button id="share-view" class="btn-secondary" title="Copie un lien vers cette vue exacte (période, filtres, caméra)">🔗 Partager cette vue</button>
+      <p id="share-status" class="fineprint"></p>
       <button id="refresh" class="btn">↻ Actualiser les données</button>
       <p id="status" class="fineprint"></p>
     </section>
