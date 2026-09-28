@@ -343,10 +343,13 @@ body.sp-open .timeline-wrap { right: calc(var(--side-w) + 226px); }
   padding: 6px 8px; border-radius: 7px; background: var(--raised);
   font-size: 0.76rem; line-height: 1.3;
   animation: tj-in 0.35s ease;
+  cursor: pointer; transition: background 0.15s ease;
 }
+#tj-list li:hover { background: var(--accent); background: color-mix(in srgb, var(--accent) 22%, var(--raised)); }
 #tj-list li b { display: block; font-weight: 600; }
 #tj-list li span { color: var(--muted); font-size: 0.7rem; }
-#tj-list .tj-empty { color: var(--muted); background: transparent; padding: 4px 8px; }
+#tj-list .tj-empty { color: var(--muted); background: transparent; padding: 4px 8px; cursor: default; animation: tj-in 0.35s ease; }
+#tj-list .tj-empty:hover { background: transparent; }
 @keyframes tj-in {
   from { opacity: 0; transform: translateY(4px); background: rgba(229, 72, 77, 0.35); }
   to { opacity: 1; transform: translateY(0); }

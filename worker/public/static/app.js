@@ -388,6 +388,27 @@ function glowIcon(hex, size, ring) {
   return c;
 }
 
+/** Construit la fiche affichée dans le panneau latéral pour un événement,
+ * qu'il vienne d'un marqueur cliqué sur le globe, du fil en direct ou du
+ * journal de la timeline — même expérience partout. */
+function eventPanelInfo(f) {
+  const [lon, lat] = f.geometry.coordinates;
+  const p = f.properties;
+  return {
+    kind: EVENT_TYPE_LABELS[p.event_type] || p.event_type || "Événement",
+    title: p.name || "Événement",
+    badge: CONFIDENCE_LABELS[p.confidence] || CONFIDENCE_LABELS.press,
+    sourceLabel: (p.sources || []).map((x) => x.label).filter((v, i, a) => a.indexOf(v) === i).join(" + "),
+    rows: [
+      ["Date", p.date_start ? `du ${frDate(p.date_start)} au ${frDate(p.event_date)}` : frDate(p.event_date)],
+      ["Victimes", p.fatalities],
+      ["Précision du lieu", p.precision],
+    ],
+    sources: p.sources,
+    lon, lat,
+  };
+}
+
 function renderMarkers(events) {
   const today = Date.now();
   markerLayer.entities.suspendEvents();
@@ -408,19 +429,7 @@ function renderMarkers(events) {
       },
       name: p.name || "Événement",
     });
-    panelInfo.set(entity, {
-      kind: EVENT_TYPE_LABELS[p.event_type] || p.event_type || "Événement",
-      title: p.name || "Événement",
-      badge: CONFIDENCE_LABELS[p.confidence] || CONFIDENCE_LABELS.press,
-      sourceLabel: (p.sources || []).map((x) => x.label).filter((v, i, a) => a.indexOf(v) === i).join(" + "),
-      rows: [
-        ["Date", p.date_start ? `du ${frDate(p.date_start)} au ${frDate(p.event_date)}` : frDate(p.event_date)],
-        ["Victimes", p.fatalities],
-        ["Précision du lieu", p.precision],
-      ],
-      sources: p.sources,
-      lon, lat,
-    });
+    panelInfo.set(entity, eventPanelInfo(f));
   }
   markerLayer.entities.resumeEvents();
 }
@@ -532,6 +541,7 @@ function renderTimelineHistogram() {
  * d'arrivée — la lecture avance parfois de plusieurs jours par pas, on ne
  * veut rien laisser passer silencieusement. Un simple déplacement (pas de
  * lecture) ou un retour en arrière ne montre que le jour d'arrivée. */
+let journalItems = [];
 function renderJournal(fromIdx, toIdx) {
   const events = [];
   for (let i = Math.max(0, fromIdx); i <= toIdx; i++) events.push(...dayEvents[i]);
@@ -540,18 +550,26 @@ function renderJournal(fromIdx, toIdx) {
   journalEl.hidden = false;
   $("tj-date").textContent = spanning ? `${frDate(new Date(timelineStart.getTime() + fromIdx * 86400000).toISOString().slice(0, 10))} → ${frDate(day)}` : frDate(day);
   $("tj-count").textContent = events.length ? `${events.length} événement${events.length > 1 ? "s" : ""}` : "";
-  $("tj-list").innerHTML = events.length
-    ? [...events]
-        .sort((a, b) => eventWeight(b.properties) - eventWeight(a.properties))
-        .slice(0, 12)
-        .map((f) => {
+  journalItems = events.length
+    ? [...events].sort((a, b) => eventWeight(b.properties) - eventWeight(a.properties)).slice(0, 12)
+    : [];
+  $("tj-list").innerHTML = journalItems.length
+    ? journalItems
+        .map((f, i) => {
           const p = f.properties;
           const meta = [EVENT_TYPE_LABELS[p.event_type] || p.event_type, p.fatalities ? `${p.fatalities} victimes` : null].filter(Boolean).join(" · ");
-          return `<li><b>${escapeHtml(p.name || "Événement")}</b><span>${escapeHtml(meta)}</span></li>`;
+          return `<li data-i="${i}"><b>${escapeHtml(p.name || "Événement")}</b><span>${escapeHtml(meta)}</span></li>`;
         })
         .join("")
     : `<li class="tj-empty">Aucun événement recensé ce jour-là.</li>`;
 }
+$("tj-list").addEventListener("click", (e) => {
+  const li = e.target.closest("li[data-i]");
+  const f = li && journalItems[Number(li.dataset.i)];
+  if (!f) return;
+  flyToPoint(...f.geometry.coordinates, 400000);
+  showSidePanel(eventPanelInfo(f));
+});
 
 function applyTimeline() {
   if (!timelineStart) {
@@ -1440,7 +1458,9 @@ function renderLiveFeed() {
 $("live-feed").addEventListener("click", (e) => {
   const li = e.target.closest("li[data-i]");
   const f = li && liveFeedItems[Number(li.dataset.i)];
-  if (f) flyToPoint(...f.geometry.coordinates, 400000);
+  if (!f) return;
+  flyToPoint(...f.geometry.coordinates, 400000);
+  showSidePanel(eventPanelInfo(f));
 });
 
 async function pollLiveFeed() {
