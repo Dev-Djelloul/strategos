@@ -83,6 +83,7 @@ body.app .topbar {
   white-space: nowrap;
 }
 .pill-link:hover { border-color: rgba(255, 255, 255, 0.25); }
+.lang-toggle { font: inherit; cursor: pointer; min-width: 2.6em; text-align: center; font-weight: 700; }
 
 .icon-btn {
   width: 34px;

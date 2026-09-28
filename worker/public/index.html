@@ -29,20 +29,21 @@
       <img class="brand-mark" src="/static/logo-mark.png" alt="" width="28" height="28" />
       <div>
         <h1>Strategos</h1>
-        <p>Conflits et tensions géopolitiques</p>
+        <p data-i18n="tagline">Conflits et tensions géopolitiques</p>
       </div>
     </div>
     <div class="topbar-right">
-      <span class="clock" title="Heure universelle"><span id="clock-utc">--:--:--</span> <small>UTC</small></span>
-      <span class="clock clock-local" title="Heure locale"><span id="clock-local">--:--:--</span> <small id="clock-local-zone">LOCAL</small></span>
-      <a class="pill-link" href="/methodologie">Sources et méthodologie</a>
+      <span class="clock" data-i18n-title="clock_utc" title="Heure universelle"><span id="clock-utc">--:--:--</span> <small>UTC</small></span>
+      <span class="clock clock-local" data-i18n-title="clock_local" title="Heure locale"><span id="clock-local">--:--:--</span> <small id="clock-local-zone">LOCAL</small></span>
+      <button id="lang-toggle" class="pill-link lang-toggle" type="button" title="Switch language / Changer de langue">EN</button>
+      <a class="pill-link" href="/methodologie" data-i18n="methodology_link">Sources et méthodologie</a>
     </div>
   </header>
 
   <aside id="controls" class="controls glass">
     <section class="card search-card">
       <form id="search-form" class="search-row" autocomplete="off">
-        <input id="search-input" type="search" placeholder="Rechercher un lieu, un pays, une ville…" aria-label="Rechercher un lieu" />
+        <input id="search-input" type="search" data-i18n-placeholder="search_placeholder" placeholder="Rechercher un lieu, un pays, une ville…" aria-label="Rechercher un lieu" />
         <button type="submit" class="icon-btn" aria-label="Rechercher">🔍</button>
       </form>
       <ul id="search-results" class="search-results" hidden></ul>
@@ -50,145 +51,145 @@
     </section>
 
     <section class="card view-card">
-      <div class="card-head"><h2>Dans la vue</h2><span id="vs-scope" class="muted">Monde entier</span></div>
+      <div class="card-head"><h2 data-i18n="in_view_title">Dans la vue</h2><span id="vs-scope" class="muted" data-i18n="scope_world">Monde entier</span></div>
       <div class="stats">
-        <div><b id="vs-events">–</b><span>événements</span></div>
-        <div><b id="vs-fat">–</b><span>victimes<sup>*</sup></span></div>
-        <div><b id="vs-verified">–</b><span>qualifiés</span></div>
+        <div><b id="vs-events">–</b><span data-i18n="stat_events">événements</span></div>
+        <div><b id="vs-fat">–</b><span data-i18n="stat_fatalities">victimes*</span></div>
+        <div><b id="vs-verified">–</b><span data-i18n="stat_verified">qualifiés</span></div>
       </div>
       <div id="vs-types" class="type-bars"></div>
-      <p class="fineprint"><sup>*</sup> victimes déclarées par les sources qualifiées (UCDP) ; la presse n'en fournit pas.</p>
+      <p class="fineprint"><sup>*</sup> <span data-i18n="fatalities_note">victimes déclarées par les sources qualifiées (UCDP) ; la presse n'en fournit pas.</span></p>
     </section>
 
     <section class="card">
-      <div class="card-head"><h2>Tendance</h2><span id="trend-period" class="muted"></span></div>
+      <div class="card-head"><h2 data-i18n="trend_title">Tendance</h2><span id="trend-period" class="muted"></span></div>
       <div id="trend-chart" class="trend-chart" aria-hidden="true"></div>
       <p id="trend-summary" class="fineprint"></p>
     </section>
 
     <section class="card">
-      <div class="card-head"><h2>Résumé du jour</h2><span class="muted">Dernières 24 h · monde entier</span></div>
+      <div class="card-head"><h2 data-i18n="daily_title">Résumé du jour</h2><span class="muted" data-i18n="daily_subtitle">Dernières 24 h · monde entier</span></div>
       <div class="stats">
-        <div><b id="daily-events">–</b><span>événements</span></div>
-        <div><b id="daily-fat">–</b><span>victimes<sup>*</sup></span></div>
-        <div><b id="daily-verified">–</b><span>qualifiés</span></div>
+        <div><b id="daily-events">–</b><span data-i18n="stat_events">événements</span></div>
+        <div><b id="daily-fat">–</b><span data-i18n="stat_fatalities">victimes*</span></div>
+        <div><b id="daily-verified">–</b><span data-i18n="stat_verified">qualifiés</span></div>
       </div>
       <div id="daily-types" class="type-bars"></div>
-      <p id="daily-status" class="fineprint">Chargement…</p>
+      <p id="daily-status" class="fineprint" data-i18n="loading">Chargement…</p>
     </section>
 
     <section class="card">
-      <div class="card-head"><h2>Nouveaux événements <span id="live-badge" class="live-badge" hidden>0</span></h2><span class="muted">Depuis l'ouverture</span></div>
+      <div class="card-head"><h2><span data-i18n="live_title">Nouveaux événements</span> <span id="live-badge" class="live-badge" hidden>0</span></h2><span class="muted" data-i18n="live_subtitle">Depuis l'ouverture</span></div>
       <ul id="live-feed" class="search-results live-feed"></ul>
-      <p id="live-status" class="fineprint">Chargement…</p>
-      <button id="push-toggle" type="button" class="btn-secondary link-btn push-btn">🔔 Activer les notifications</button>
+      <p id="live-status" class="fineprint" data-i18n="loading">Chargement…</p>
+      <button id="push-toggle" type="button" class="btn-secondary link-btn push-btn" data-i18n="push_enable">🔔 Activer les notifications</button>
       <p id="push-status" class="fineprint"></p>
-      <label class="field push-countries-field" title="Laisse vide pour être notifié de tous les pays suivis">
-        <span>Limiter aux pays (optionnel)</span>
+      <label class="field push-countries-field" data-i18n-title="push_countries_title" title="Laisse vide pour être notifié de tous les pays suivis">
+        <span data-i18n="push_countries_label">Limiter aux pays (optionnel)</span>
         <select id="push-countries" multiple size="4"></select>
       </label>
     </section>
 
     <section class="card">
-      <div class="card-head"><h2>Période</h2></div>
+      <div class="card-head"><h2 data-i18n="period_title">Période</h2></div>
       <div class="segmented" id="period" role="group" aria-label="Période">
-        <button data-days="1">24 h</button>
-        <button data-days="7">7 j</button>
-        <button data-days="30" class="active">30 j</button>
-        <button data-days="90">90 j</button>
+        <button data-days="1" data-i18n="period_24h">24 h</button>
+        <button data-days="7" data-i18n="period_7d">7 j</button>
+        <button data-days="30" class="active" data-i18n="period_30d">30 j</button>
+        <button data-days="90" data-i18n="period_90d">90 j</button>
       </div>
       <div class="field-row">
-        <label class="field"><span>Pays</span>
-          <select id="country"><option value="">Tous</option></select>
+        <label class="field"><span data-i18n="filter_country">Pays</span>
+          <select id="country"><option value="" data-i18n="all_fem">Tous</option></select>
         </label>
-        <label class="field"><span>Type</span>
-          <select id="event-type"><option value="all">Tous</option></select>
+        <label class="field"><span data-i18n="filter_type">Type</span>
+          <select id="event-type"><option value="all" data-i18n="all_masc">Tous</option></select>
         </label>
       </div>
     </section>
 
     <section class="card">
-      <div class="card-head"><h2>Sources de conflits</h2></div>
+      <div class="card-head"><h2 data-i18n="sources_title">Sources de conflits</h2></div>
       <div id="source-alert" class="alert" hidden></div>
-      <label class="row" title="Uppsala Conflict Data Program — référence académique, environ 2 semaines de décalage">
+      <label class="row" data-i18n-title="ucdp_title" title="Uppsala Conflict Data Program — référence académique, environ 2 semaines de décalage">
         <input type="checkbox" class="switch" id="ucdp-toggle" checked />
         <span class="dot" style="--c:#4caf7d"></span>
         <span class="row-main">UCDP <small id="ucdp-status" class="status"></small></span>
       </label>
-      <label class="row" title="Détection automatique dans la presse mondiale — non vérifié">
+      <label class="row" data-i18n-title="gdelt_title" title="Détection automatique dans la presse mondiale — non vérifié">
         <input type="checkbox" class="switch" id="gdelt-toggle" checked />
         <span class="dot" style="--c:#e0a13c"></span>
-        <span class="row-main">GDELT · presse <small id="gdelt-status" class="status"></small></span>
+        <span class="row-main"><span data-i18n="gdelt_label">GDELT · presse</span> <small id="gdelt-status" class="status"></small></span>
       </label>
       <p id="ucdp-note" class="fineprint" hidden></p>
-      <label class="row sub" title="Décoché : seuls les événements appuyés par une source qualifiée restent">
+      <label class="row sub" data-i18n-title="press_toggle_title" title="Décoché : seuls les événements appuyés par une source qualifiée restent">
         <input type="checkbox" class="switch" id="press-toggle" checked />
-        <span class="row-main">Inclure les événements « presse seule »</span>
+        <span class="row-main" data-i18n="press_toggle_label">Inclure les événements « presse seule »</span>
       </label>
     </section>
 
     <section class="card">
-      <div class="card-head"><h2>Couches</h2></div>
-      <label class="row" title="Contrôle territorial des localités en Ukraine (VIINA) — estimation agrégée. Bleu : tenu par l'Ukraine · Orange : contesté · Rouge : sous contrôle russe">
+      <div class="card-head"><h2 data-i18n="layers_title">Couches</h2></div>
+      <label class="row" data-i18n-title="control_ukraine_title" title="Contrôle territorial des localités en Ukraine (VIINA) — estimation agrégée. Bleu : tenu par l'Ukraine · Orange : contesté · Rouge : sous contrôle russe">
         <input type="checkbox" class="switch" id="control-toggle" />
-        <span class="row-main">Contrôle territorial · Ukraine <small id="control-status" class="status"></small></span>
+        <span class="row-main"><span data-i18n="control_ukraine_label">Contrôle territorial · Ukraine</span> <small id="control-status" class="status"></small></span>
       </label>
-      <label class="row" title="Zones de contrôle par district au Yémen (ACAPS) — mise à jour environ trimestrielle. Bleu : gouvernement internationalement reconnu (IRG) · Rouge : autorités de facto/Ansar Allah (DFA)">
+      <label class="row" data-i18n-title="control_yemen_title" title="Zones de contrôle par district au Yémen (ACAPS) — mise à jour environ trimestrielle. Bleu : gouvernement internationalement reconnu (IRG) · Rouge : autorités de facto/Ansar Allah (DFA)">
         <input type="checkbox" class="switch" id="yemen-control-toggle" />
-        <span class="row-main">Contrôle territorial · Yémen <small id="yemen-control-status" class="status"></small></span>
+        <span class="row-main"><span data-i18n="control_yemen_label">Contrôle territorial · Yémen</span> <small id="yemen-control-status" class="status"></small></span>
       </label>
-      <label class="row" title="Zones A/B/C de Cisjordanie (accords d'Oslo, OCHA) — classification LÉGALE statique, pas une ligne de front. Bleu : contrôle palestinien (A) · Orange : mixte (B) · Rouge : contrôle israélien (C) · Violet : Jérusalem-Est. Gaza non couvert : aucune source fiable et à jour trouvée.">
+      <label class="row" data-i18n-title="control_westbank_title" title="Zones A/B/C de Cisjordanie (accords d'Oslo, OCHA) — classification LÉGALE statique, pas une ligne de front. Bleu : contrôle palestinien (A) · Orange : mixte (B) · Rouge : contrôle israélien (C) · Violet : Jérusalem-Est. Gaza non couvert : aucune source fiable et à jour trouvée.">
         <input type="checkbox" class="switch" id="westbank-control-toggle" />
-        <span class="row-main">Contrôle territorial · Cisjordanie <small id="westbank-control-status" class="status"></small></span>
+        <span class="row-main"><span data-i18n="control_westbank_label">Contrôle territorial · Cisjordanie</span> <small id="westbank-control-status" class="status"></small></span>
       </label>
       <label class="row">
         <input type="checkbox" class="switch" id="nuclear-toggle" checked />
-        <span class="row-main">☢️ Sites nucléaires civils <small id="nuclear-status" class="status"></small></span>
+        <span class="row-main"><span data-i18n="nuclear_label">☢️ Sites nucléaires civils</span> <small id="nuclear-status" class="status"></small></span>
       </label>
       <label class="row">
         <input type="checkbox" class="switch" id="military-toggle" />
-        <span class="row-main">🎖️ Bases militaires <small id="military-status" class="status"></small></span>
+        <span class="row-main"><span data-i18n="military_label">🎖️ Bases militaires</span> <small id="military-status" class="status"></small></span>
       </label>
       <label class="row">
         <input type="checkbox" class="switch" id="infrastructure-toggle" />
-        <span class="row-main">✈️ Infrastructures <small id="infrastructure-status" class="status"></small></span>
+        <span class="row-main"><span data-i18n="infra_label">✈️ Infrastructures</span> <small id="infrastructure-status" class="status"></small></span>
       </label>
     </section>
 
     <section class="card">
-      <div class="card-head"><h2>Navigation</h2></div>
-      <label class="field"><span>Aller à</span>
-        <select id="region"><option value="">Choisir une région…</option></select>
+      <div class="card-head"><h2 data-i18n="navigation_title">Navigation</h2></div>
+      <label class="field"><span data-i18n="goto_label">Aller à</span>
+        <select id="region"><option value="" data-i18n="goto_placeholder">Choisir une région…</option></select>
       </label>
       <div class="segmented" id="view-mode" role="group" aria-label="Affichage des événements">
-        <button data-mode="auto" class="active" title="Hexagones de loin, marqueurs de près">Auto</button>
-        <button data-mode="hex" title="Colonnes hexagonales 3D">Hexagones</button>
-        <button data-mode="markers" title="Marqueurs individuels">Marqueurs</button>
+        <button data-mode="auto" class="active" data-i18n-title="mode_auto_title" title="Hexagones de loin, marqueurs de près" data-i18n="mode_auto">Auto</button>
+        <button data-mode="hex" data-i18n-title="mode_hex_title" title="Colonnes hexagonales 3D" data-i18n="mode_hex">Hexagones</button>
+        <button data-mode="markers" data-i18n-title="mode_markers_title" title="Marqueurs individuels" data-i18n="mode_markers">Marqueurs</button>
       </div>
-      <label class="row" title="Villes et reliefs en 3D photoréaliste (Google via Cesium Ion), à zoom rapproché">
+      <label class="row" data-i18n-title="photo3d_title" title="Villes et reliefs en 3D photoréaliste (Google via Cesium Ion), à zoom rapproché">
         <input type="checkbox" class="switch" id="photo3d-toggle" />
-        <span class="row-main">Villes 3D photoréalistes</span>
+        <span class="row-main" data-i18n="photo3d_label">Villes 3D photoréalistes</span>
       </label>
-      <p id="nav-hint" class="nav-hint" hidden>Déplacement au sol : <kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> ou <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> pour avancer/tourner, molette pour zoomer, glisser pour regarder autour.</p>
-      <label class="row" title="Ombre du soleil en temps réel (la face nocturne est sombre)">
+      <p id="nav-hint" class="nav-hint" hidden data-i18n-html="nav_hint">Déplacement au sol : <kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> ou <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> pour avancer/tourner, molette pour zoomer, glisser pour regarder autour.</p>
+      <label class="row" data-i18n-title="daynight_title" title="Ombre du soleil en temps réel (la face nocturne est sombre)">
         <input type="checkbox" class="switch" id="daynight-toggle" />
-        <span class="row-main">Jour / nuit en temps réel</span>
+        <span class="row-main" data-i18n="daynight_label">Jour / nuit en temps réel</span>
       </label>
-      <button id="share-view" class="btn-secondary" title="Copie un lien vers cette vue exacte (période, filtres, caméra)">🔗 Partager cette vue</button>
+      <button id="share-view" class="btn-secondary" data-i18n-title="share_title" title="Copie un lien vers cette vue exacte (période, filtres, caméra)" data-i18n="share_button">🔗 Partager cette vue</button>
       <p id="share-status" class="fineprint"></p>
-      <button id="refresh" class="btn">↻ Actualiser les données</button>
+      <button id="refresh" class="btn" data-i18n="refresh_button">↻ Actualiser les données</button>
       <p id="status" class="fineprint"></p>
     </section>
   </aside>
 
   <div id="legend" class="legend glass">
-    <div class="legend-title">Intensité</div>
+    <div class="legend-title" data-i18n="legend_intensity">Intensité</div>
     <div class="ramp"></div>
-    <div class="ramp-labels"><span>faible</span><span>forte</span></div>
+    <div class="ramp-labels"><span data-i18n="legend_low">faible</span><span data-i18n="legend_high">forte</span></div>
     <div class="legend-items">
-      <span><i class="lg lg-confirmed"></i> confirmé</span>
-      <span><i class="lg lg-verified"></i> qualifié</span>
-      <span><i class="lg lg-press"></i> presse</span>
+      <span><i class="lg lg-confirmed"></i> <span data-i18n="legend_confirmed">confirmé</span></span>
+      <span><i class="lg lg-verified"></i> <span data-i18n="legend_verified">qualifié</span></span>
+      <span><i class="lg lg-press"></i> <span data-i18n="legend_press">presse</span></span>
     </div>
   </div>
 

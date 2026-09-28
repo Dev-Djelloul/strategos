@@ -7,6 +7,266 @@
 // dessiné en hexagones posés au sol ; les autres couches en icônes regroupées.
 (async () => {
 
+// ───────────────────────── Internationalisation (FR/EN) ─────────────────────────
+// Traduction de l'interface (chrome statique + vocabulaire récurrent des
+// panneaux/cartes). La page /methodologie (prose longue) reste en français
+// pour l'instant — hors périmètre de cette première version.
+let LANG = localStorage.getItem("strategos_lang") === "en" ? "en" : "fr";
+const UI_I18N = {
+  fr: {
+    tagline: "Conflits et tensions géopolitiques",
+    methodology_link: "Sources et méthodologie",
+    clock_utc: "Heure universelle",
+    clock_local: "Heure locale",
+    search_placeholder: "Rechercher un lieu, un pays, une ville…",
+    in_view_title: "Dans la vue",
+    scope_world: "Monde entier",
+    scope_zone: "Zone visible",
+    stat_events: "événements",
+    stat_fatalities: "victimes*",
+    stat_verified: "qualifiés",
+    fatalities_note: "victimes déclarées par les sources qualifiées (UCDP) ; la presse n'en fournit pas.",
+    trend_title: "Tendance",
+    daily_title: "Résumé du jour",
+    daily_subtitle: "Dernières 24 h · monde entier",
+    loading: "Chargement…",
+    live_title: "Nouveaux événements",
+    live_subtitle: "Depuis l'ouverture",
+    push_enable: "🔔 Activer les notifications",
+    push_disable: "🔕 Désactiver les notifications",
+    push_unsupported: "🔕 Notifications non disponibles",
+    push_unsupported_status: "Ce navigateur ne prend pas en charge les notifications push.",
+    push_denied: "🔕 Notifications bloquées",
+    push_denied_status: "Autorise les notifications pour ce site dans les réglages du navigateur.",
+    push_subscribed_status: "Tu seras notifié quand un nouvel événement apparaît, même onglet en arrière-plan.",
+    push_countries_title: "Laisse vide pour être notifié de tous les pays suivis",
+    push_countries_label: "Limiter aux pays (optionnel)",
+    push_filter_updated: "Filtre mis à jour.",
+    push_filter_all: "Notifié pour tous les pays suivis.",
+    period_title: "Période",
+    period_24h: "24 h",
+    period_7d: "7 j",
+    period_30d: "30 j",
+    period_90d: "90 j",
+    filter_country: "Pays",
+    filter_type: "Type",
+    all_fem: "Tous",
+    all_masc: "Tous",
+    sources_title: "Sources de conflits",
+    ucdp_title: "Uppsala Conflict Data Program — référence académique, environ 2 semaines de décalage",
+    gdelt_title: "Détection automatique dans la presse mondiale — non vérifié",
+    gdelt_label: "GDELT · presse",
+    press_toggle_title: "Décoché : seuls les événements appuyés par une source qualifiée restent",
+    press_toggle_label: "Inclure les événements « presse seule »",
+    layers_title: "Couches",
+    control_ukraine_title: "Contrôle territorial des localités en Ukraine (VIINA) — estimation agrégée. Bleu : tenu par l'Ukraine · Orange : contesté · Rouge : sous contrôle russe",
+    control_ukraine_label: "Contrôle territorial · Ukraine",
+    control_yemen_title: "Zones de contrôle par district au Yémen (ACAPS) — mise à jour environ trimestrielle. Bleu : gouvernement internationalement reconnu (IRG) · Rouge : autorités de facto/Ansar Allah (DFA)",
+    control_yemen_label: "Contrôle territorial · Yémen",
+    control_westbank_title: "Zones A/B/C de Cisjordanie (accords d'Oslo, OCHA) — classification LÉGALE statique, pas une ligne de front. Bleu : contrôle palestinien (A) · Orange : mixte (B) · Rouge : contrôle israélien (C) · Violet : Jérusalem-Est. Gaza non couvert : aucune source fiable et à jour trouvée.",
+    control_westbank_label: "Contrôle territorial · Cisjordanie",
+    nuclear_label: "☢️ Sites nucléaires civils",
+    military_label: "🎖️ Bases militaires",
+    infra_label: "✈️ Infrastructures",
+    navigation_title: "Navigation",
+    goto_label: "Aller à",
+    goto_placeholder: "Choisir une région…",
+    mode_auto: "Auto",
+    mode_auto_title: "Hexagones de loin, marqueurs de près",
+    mode_hex: "Hexagones",
+    mode_hex_title: "Colonnes hexagonales 3D",
+    mode_markers: "Marqueurs",
+    mode_markers_title: "Marqueurs individuels",
+    photo3d_title: "Villes et reliefs en 3D photoréaliste (Google via Cesium Ion), à zoom rapproché",
+    photo3d_label: "Villes 3D photoréalistes",
+    nav_hint: "Déplacement au sol : <kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> ou <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> pour avancer/tourner, molette pour zoomer, glisser pour regarder autour.",
+    daynight_title: "Ombre du soleil en temps réel (la face nocturne est sombre)",
+    daynight_label: "Jour / nuit en temps réel",
+    share_title: "Copie un lien vers cette vue exacte (période, filtres, caméra)",
+    share_button: "🔗 Partager cette vue",
+    share_copied: "Lien copié dans le presse-papiers !",
+    refresh_button: "↻ Actualiser les données",
+    legend_intensity: "Intensité",
+    legend_low: "faible",
+    legend_high: "forte",
+    legend_confirmed: "confirmé",
+    legend_verified: "qualifié",
+    legend_press: "presse",
+    default_event: "Événement",
+    row_date: "Date",
+    row_victims: "Victimes",
+    row_precision: "Précision du lieu",
+    row_country: "Pays",
+    row_status: "Statut",
+    row_type: "Type",
+    row_operator: "Opérateur",
+    row_region: "Région",
+    row_localities_russian: "Localités sous contrôle russe",
+    row_localities_contested: "Localités contestées",
+    row_data_as_of: "Données au",
+    row_governorate: "Gouvernorat",
+    row_control: "Contrôle",
+    unnamed: "Sans nom",
+    items_title_default: "Événements",
+    open_source_link: "Ouvrir la source ↗",
+    zoom_to_place: "Zoomer sur le lieu",
+    date_range_from: "du",
+    date_range_to: "au",
+    kind_nuclear: "Installation nucléaire civile",
+    kind_military: "Site militaire",
+    kind_infrastructure: "Infrastructure",
+    control_kind_ukraine: "Contrôle territorial (Ukraine)",
+    control_kind_yemen: "Contrôle territorial (Yémen)",
+    control_kind_westbank: "Contrôle territorial (Cisjordanie)",
+    zone_russian: "Zone sous contrôle russe",
+    zone_contested: "Zone contestée",
+    zone_liberated: "Zone récemment libérée",
+    zone_default: "Zone",
+    district_default: "District",
+    items_title_changes: "Changements de main",
+    change_to_russian: "passée sous contrôle russe",
+    change_to_contested: "devenue contestée",
+    change_liberated: "libérée",
+    control_notes_ukraine: "Estimation par vote entre plusieurs sources (DeepStateMap, ISW, Wikipédia, presse), agrégée en hexagones de ~17 km. Ce n'est pas une ligne de front officielle.",
+    control_notes_yemen: "Zones de contrôle par district (admin2), mise à jour environ trimestrielle par ACAPS. Ce n'est pas une ligne de front quotidienne.",
+    hex_kind: "Zone d'activité",
+    row_fatalities_qualified: "Victimes (sources qualifiées)",
+    row_qualified_events: "Événements qualifiés",
+    row_press_only: "Détectés par la presse seule",
+  },
+  en: {
+    tagline: "Armed conflicts and geopolitical tensions",
+    methodology_link: "Sources & methodology",
+    clock_utc: "Universal time",
+    clock_local: "Local time",
+    search_placeholder: "Search a place, country, city…",
+    in_view_title: "In view",
+    scope_world: "Whole world",
+    scope_zone: "Visible area",
+    stat_events: "events",
+    stat_fatalities: "fatalities*",
+    stat_verified: "qualified",
+    fatalities_note: "fatalities reported by qualified sources (UCDP); press sources don't provide them.",
+    trend_title: "Trend",
+    daily_title: "Today's summary",
+    daily_subtitle: "Last 24 h · whole world",
+    loading: "Loading…",
+    live_title: "New events",
+    live_subtitle: "Since opening",
+    push_enable: "🔔 Enable notifications",
+    push_disable: "🔕 Disable notifications",
+    push_unsupported: "🔕 Notifications unavailable",
+    push_unsupported_status: "This browser does not support push notifications.",
+    push_denied: "🔕 Notifications blocked",
+    push_denied_status: "Allow notifications for this site in your browser settings.",
+    push_subscribed_status: "You'll be notified when a new event appears, even with the tab in the background.",
+    push_countries_title: "Leave empty to be notified for every tracked country",
+    push_countries_label: "Limit to countries (optional)",
+    push_filter_updated: "Filter updated.",
+    push_filter_all: "Notified for all tracked countries.",
+    period_title: "Period",
+    period_24h: "24 h",
+    period_7d: "7 d",
+    period_30d: "30 d",
+    period_90d: "90 d",
+    filter_country: "Country",
+    filter_type: "Type",
+    all_fem: "All",
+    all_masc: "All",
+    sources_title: "Conflict sources",
+    ucdp_title: "Uppsala Conflict Data Program — academic reference, about 2 weeks of delay",
+    gdelt_title: "Automatic detection in the world press — unverified",
+    gdelt_label: "GDELT · press",
+    press_toggle_title: "Unchecked: only events backed by a qualified source remain",
+    press_toggle_label: "Include \"press only\" events",
+    layers_title: "Layers",
+    control_ukraine_title: "Territorial control of localities in Ukraine (VIINA) — aggregated estimate. Blue: held by Ukraine · Orange: contested · Red: under Russian control",
+    control_ukraine_label: "Territorial control · Ukraine",
+    control_yemen_title: "District-level control zones in Yemen (ACAPS) — updated roughly quarterly. Blue: internationally recognized government (IRG) · Red: de facto authorities/Ansar Allah (DFA)",
+    control_yemen_label: "Territorial control · Yemen",
+    control_westbank_title: "A/B/C zones of the West Bank (Oslo Accords, OCHA) — static LEGAL classification, not a front line. Blue: Palestinian control (A) · Orange: mixed (B) · Red: Israeli control (C) · Purple: East Jerusalem. Gaza not covered: no reliable, up-to-date source found.",
+    control_westbank_label: "Territorial control · West Bank",
+    nuclear_label: "☢️ Civilian nuclear sites",
+    military_label: "🎖️ Military bases",
+    infra_label: "✈️ Infrastructure",
+    navigation_title: "Navigation",
+    goto_label: "Go to",
+    goto_placeholder: "Choose a region…",
+    mode_auto: "Auto",
+    mode_auto_title: "Hexagons when zoomed out, markers up close",
+    mode_hex: "Hexagons",
+    mode_hex_title: "3D hexagonal columns",
+    mode_markers: "Markers",
+    mode_markers_title: "Individual markers",
+    photo3d_title: "Photorealistic 3D cities and terrain (Google via Cesium Ion), up close",
+    photo3d_label: "Photorealistic 3D cities",
+    nav_hint: "Ground movement: <kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> to move/turn, scroll to zoom, drag to look around.",
+    daynight_title: "Real-time sun shadow (the night side is dark)",
+    daynight_label: "Real-time day / night",
+    share_title: "Copy a link to this exact view (period, filters, camera)",
+    share_button: "🔗 Share this view",
+    share_copied: "Link copied to clipboard!",
+    refresh_button: "↻ Refresh data",
+    legend_intensity: "Intensity",
+    legend_low: "low",
+    legend_high: "high",
+    legend_confirmed: "confirmed",
+    legend_verified: "qualified",
+    legend_press: "press",
+    default_event: "Event",
+    row_date: "Date",
+    row_victims: "Fatalities",
+    row_precision: "Location precision",
+    row_country: "Country",
+    row_status: "Status",
+    row_type: "Type",
+    row_operator: "Operator",
+    row_region: "Region",
+    row_localities_russian: "Localities under Russian control",
+    row_localities_contested: "Contested localities",
+    row_data_as_of: "Data as of",
+    row_governorate: "Governorate",
+    row_control: "Control",
+    unnamed: "Unnamed",
+    items_title_default: "Events",
+    open_source_link: "Open source ↗",
+    zoom_to_place: "Zoom to location",
+    date_range_from: "from",
+    date_range_to: "to",
+    kind_nuclear: "Civilian nuclear facility",
+    kind_military: "Military site",
+    kind_infrastructure: "Infrastructure",
+    control_kind_ukraine: "Territorial control (Ukraine)",
+    control_kind_yemen: "Territorial control (Yemen)",
+    control_kind_westbank: "Territorial control (West Bank)",
+    zone_russian: "Zone under Russian control",
+    zone_contested: "Contested zone",
+    zone_liberated: "Recently liberated zone",
+    zone_default: "Zone",
+    district_default: "District",
+    items_title_changes: "Changes of control",
+    change_to_russian: "fell under Russian control",
+    change_to_contested: "became contested",
+    change_liberated: "liberated",
+    control_notes_ukraine: "Estimate by vote across several sources (DeepStateMap, ISW, Wikipedia, press), aggregated into ~17 km hexagons. Not an official front line.",
+    control_notes_yemen: "District-level (admin2) control zones, updated roughly quarterly by ACAPS. Not a daily front line.",
+    hex_kind: "Activity zone",
+    row_fatalities_qualified: "Fatalities (qualified sources)",
+    row_qualified_events: "Qualified events",
+    row_press_only: "Press-only detections",
+  },
+};
+const tr = (key) => UI_I18N[LANG][key] ?? UI_I18N.fr[key] ?? key;
+const numLocale = () => (LANG === "fr" ? "fr-FR" : "en-US");
+
+function applyI18n() {
+  document.documentElement.lang = LANG;
+  document.querySelectorAll("[data-i18n]").forEach((el) => (el.textContent = tr(el.dataset.i18n)));
+  document.querySelectorAll("[data-i18n-title]").forEach((el) => (el.title = tr(el.dataset.i18nTitle)));
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => (el.placeholder = tr(el.dataset.i18nPlaceholder)));
+  document.querySelectorAll("[data-i18n-html]").forEach((el) => (el.innerHTML = tr(el.dataset.i18nHtml)));
+  $("lang-toggle").textContent = LANG === "fr" ? "EN" : "FR";
+}
 // ───────────────────────── Globe ─────────────────────────
 const ionToken = window.CESIUM_ION_TOKEN || "";
 Cesium.Ion.defaultAccessToken = ionToken || undefined;
@@ -92,6 +352,7 @@ viewer.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEF
 
 // ───────────────────────── Utilitaires ─────────────────────────
 const $ = (id) => document.getElementById(id);
+applyI18n();
 const escapeHtml = (s) => {
   const d = document.createElement("div");
   d.textContent = s ?? "";
@@ -120,34 +381,51 @@ function setStatus(prefix, { text, kind = "" } = {}) {
 function layerStatus(prefix, { count, error, fetchedAt, stale, staleReason, loading, note } = {}) {
   const el = $(`${prefix}-status`);
   if (el) el.title = "";
-  if (loading) return setStatus(prefix, { text: "première récupération en cours…", kind: "loading" });
+  if (loading) return setStatus(prefix, { text: LANG === "fr" ? "première récupération en cours…" : "fetching for the first time…", kind: "loading" });
   if (error) {
     if (el) el.title = error;
-    return setStatus(prefix, { text: "indisponible", kind: "warn" });
+    return setStatus(prefix, { text: LANG === "fr" ? "indisponible" : "unavailable", kind: "warn" });
   }
   if (count === undefined) return setStatus(prefix, {});
   const when = fetchedAt ? new Date(fetchedAt) : new Date();
   if (stale) {
-    if (el) el.title = `Source injoignable (${staleReason || "erreur"}) — dernière donnée réelle en cache`;
-    const d = when.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
-    const t = when.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-    return setStatus(prefix, { text: `${count} · donnée du ${d} ${t} (source injoignable)`, kind: "warn" });
+    if (el) el.title = LANG === "fr" ? `Source injoignable (${staleReason || "erreur"}) — dernière donnée réelle en cache` : `Source unreachable (${staleReason || "error"}) — last real data cached`;
+    const d = when.toLocaleDateString(numLocale(), { day: "2-digit", month: "2-digit" });
+    const t = when.toLocaleTimeString(numLocale(), { hour: "2-digit", minute: "2-digit" });
+    return setStatus(prefix, { text: LANG === "fr" ? `${count} · donnée du ${d} ${t} (source injoignable)` : `${count} · data from ${d} ${t} (source unreachable)`, kind: "warn" });
   }
   setStatus(prefix, { text: note ? `${count} · ${note}` : `${count}`, kind: "ok" });
 }
 
 // ───────────────────────── Panneau de détail ─────────────────────────
-const RELIABILITY = {
-  verified: { label: "Source qualifiée", cls: "rel-verified" },
-  press: { label: "Presse — non vérifié", cls: "rel-press" },
-  community: { label: "Base collaborative", cls: "rel-community" },
-  modeled: { label: "Estimation agrégée", cls: "rel-community" },
+const RELIABILITY_BY_LANG = {
+  fr: {
+    verified: { label: "Source qualifiée", cls: "rel-verified" },
+    press: { label: "Presse — non vérifié", cls: "rel-press" },
+    community: { label: "Base collaborative", cls: "rel-community" },
+    modeled: { label: "Estimation agrégée", cls: "rel-community" },
+  },
+  en: {
+    verified: { label: "Qualified source", cls: "rel-verified" },
+    press: { label: "Press — unverified", cls: "rel-press" },
+    community: { label: "Community database", cls: "rel-community" },
+    modeled: { label: "Aggregated estimate", cls: "rel-community" },
+  },
 };
-const CONFIDENCE_LABELS = {
-  confirmed: { label: "Confirmé — plusieurs sources dont une qualifiée", cls: "rel-verified" },
-  verified: { label: "Source qualifiée", cls: "rel-verified" },
-  press: { label: "Presse — non vérifié", cls: "rel-press" },
+const CONFIDENCE_LABELS_BY_LANG = {
+  fr: {
+    confirmed: { label: "Confirmé — plusieurs sources dont une qualifiée", cls: "rel-verified" },
+    verified: { label: "Source qualifiée", cls: "rel-verified" },
+    press: { label: "Presse — non vérifié", cls: "rel-press" },
+  },
+  en: {
+    confirmed: { label: "Confirmed — multiple sources including a qualified one", cls: "rel-verified" },
+    verified: { label: "Qualified source", cls: "rel-verified" },
+    press: { label: "Press — unverified", cls: "rel-press" },
+  },
 };
+let RELIABILITY = RELIABILITY_BY_LANG[LANG];
+let CONFIDENCE_LABELS = CONFIDENCE_LABELS_BY_LANG[LANG];
 const sidePanelEl = $("side-panel");
 
 function showSidePanel(info) {
@@ -169,14 +447,14 @@ function showSidePanel(info) {
 
   $("side-panel-body").innerHTML = `
     <div class="sp-kind">${escapeHtml(info.kind || "")}</div>
-    <h2 class="sp-title">${escapeHtml(info.title || "Sans nom")}</h2>
+    <h2 class="sp-title">${escapeHtml(info.title || tr("unnamed"))}</h2>
     <div class="sp-source"><span class="sp-rel ${rel.cls}">${rel.label}</span> <span>${escapeHtml(info.sourceLabel || "")}</span></div>
     <dl class="sp-rows">${rows}</dl>
-    ${items ? `<h3 class="sp-h3">${escapeHtml(info.itemsTitle || "Événements")}</h3><ul class="sp-items">${items}</ul>` : ""}
+    ${items ? `<h3 class="sp-h3">${escapeHtml(info.itemsTitle || tr("items_title_default"))}</h3><ul class="sp-items">${items}</ul>` : ""}
     ${sources ? `<h3 class="sp-h3">Sources (${info.sources.length})</h3><ul class="sp-sources">${sources}</ul>` : ""}
     ${info.notes ? `<p class="sp-notes">${escapeHtml(info.notes)}</p>` : ""}
-    ${isUrl(info.url) ? `<a class="sp-link" href="${escapeHtml(info.url)}" target="_blank" rel="noopener noreferrer">Ouvrir la source ↗</a>` : ""}
-    <button class="btn btn-primary sp-zoom" id="sp-zoom">Zoomer sur le lieu</button>`;
+    ${isUrl(info.url) ? `<a class="sp-link" href="${escapeHtml(info.url)}" target="_blank" rel="noopener noreferrer">${tr("open_source_link")}</a>` : ""}
+    <button class="btn btn-primary sp-zoom" id="sp-zoom">${tr("zoom_to_place")}</button>`;
   $("sp-zoom").addEventListener("click", () => flyToPoint(info.lon, info.lat, info.zoomRange || 30000));
   sidePanelEl.classList.add("open");
   document.body.classList.add("sp-open");
@@ -221,13 +499,23 @@ const state = {
 };
 const panelInfo = new WeakMap();
 
-const EVENT_TYPE_LABELS = {
-  airstrike: "Frappes aériennes / tirs à distance",
-  offensive: "Batailles / offensives",
-  protest: "Manifestations",
-  casualties: "Violence contre civils",
-  ceasefire: "Développements stratégiques",
+const EVENT_TYPE_LABELS_BY_LANG = {
+  fr: {
+    airstrike: "Frappes aériennes / tirs à distance",
+    offensive: "Batailles / offensives",
+    protest: "Manifestations",
+    casualties: "Violence contre civils",
+    ceasefire: "Développements stratégiques",
+  },
+  en: {
+    airstrike: "Airstrikes / remote strikes",
+    offensive: "Battles / offensives",
+    protest: "Protests",
+    casualties: "Violence against civilians",
+    ceasefire: "Strategic developments",
+  },
 };
+let EVENT_TYPE_LABELS = EVENT_TYPE_LABELS_BY_LANG[LANG];
 const EVENT_TYPE_COLORS = {
   airstrike: "#f0803c", offensive: "#e2463b", casualties: "#c2185b", protest: "#e0a13c", ceasefire: "#4caf7d",
 };
@@ -331,22 +619,23 @@ function hexPanel(c, res) {
   const [lat, lon] = h3.cellToLatLng(c.cell);
   const top = [...c.events].sort((a, b) => eventWeight(b.properties) - eventWeight(a.properties)).slice(0, 8);
   const pressCount = c.events.length - c.verified;
+  const hexKm = Math.round(h3.getHexagonEdgeLengthAvg(res, "km") * 2);
   return {
-    kind: "Zone d'activité",
-    title: `${c.events.length} événement${c.events.length > 1 ? "s" : ""}`,
+    kind: tr("hex_kind"),
+    title: `${c.events.length} ${tr("stat_events")}`,
     badge: c.verified ? CONFIDENCE_LABELS.verified : CONFIDENCE_LABELS.press,
-    sourceLabel: `hexagone d'environ ${Math.round(h3.getHexagonEdgeLengthAvg(res, "km") * 2)} km`,
+    sourceLabel: LANG === "fr" ? `hexagone d'environ ${hexKm} km` : `~${hexKm} km hexagon`,
     rows: [
-      ["Victimes (sources qualifiées)", c.fatalities || null],
-      ["Événements qualifiés", c.verified],
-      ["Détectés par la presse seule", pressCount || null],
+      [tr("row_fatalities_qualified"), c.fatalities || null],
+      [tr("row_qualified_events"), c.verified],
+      [tr("row_press_only"), pressCount || null],
     ],
-    itemsTitle: top.length < c.events.length ? `Les ${top.length} plus marquants` : "Événements",
+    itemsTitle: top.length < c.events.length ? (LANG === "fr" ? `Les ${top.length} plus marquants` : `Top ${top.length}`) : tr("items_title_default"),
     items: top.map((f) => {
       const p = f.properties;
       return {
-        title: p.name || "Événement",
-        meta: [EVENT_TYPE_LABELS[p.event_type] || p.event_type, frDate(p.event_date), p.fatalities ? `${p.fatalities} victimes` : null].filter(Boolean).join(" · "),
+        title: p.name || tr("default_event"),
+        meta: [EVENT_TYPE_LABELS[p.event_type] || p.event_type, frDate(p.event_date), p.fatalities ? (LANG === "fr" ? `${p.fatalities} victimes` : `${p.fatalities} fatalities`) : null].filter(Boolean).join(" · "),
         url: p.sources?.find((s) => isUrl(s.url))?.url,
       };
     }),
@@ -394,14 +683,14 @@ function eventPanelInfo(f) {
   const [lon, lat] = f.geometry.coordinates;
   const p = f.properties;
   return {
-    kind: EVENT_TYPE_LABELS[p.event_type] || p.event_type || "Événement",
-    title: p.name || "Événement",
+    kind: EVENT_TYPE_LABELS[p.event_type] || p.event_type || tr("default_event"),
+    title: p.name || tr("default_event"),
     badge: CONFIDENCE_LABELS[p.confidence] || CONFIDENCE_LABELS.press,
     sourceLabel: (p.sources || []).map((x) => x.label).filter((v, i, a) => a.indexOf(v) === i).join(" + "),
     rows: [
-      ["Date", p.date_start ? `du ${frDate(p.date_start)} au ${frDate(p.event_date)}` : frDate(p.event_date)],
-      ["Victimes", p.fatalities],
-      ["Précision du lieu", p.precision],
+      [tr("row_date"), p.date_start ? `${tr("date_range_from")} ${frDate(p.date_start)} ${tr("date_range_to")} ${frDate(p.event_date)}` : frDate(p.event_date)],
+      [tr("row_victims"), p.fatalities],
+      [tr("row_precision"), p.precision],
     ],
     sources: p.sources,
     lon, lat,
@@ -426,7 +715,7 @@ function renderMarkers(events) {
         color: Cesium.Color.WHITE.withAlpha(p.confidence === "press" ? 0.75 : 1),
         disableDepthTestDistance: 30000,
       },
-      name: p.name || "Événement",
+      name: p.name || tr("default_event"),
     });
     panelInfo.set(entity, eventPanelInfo(f));
   }
@@ -475,7 +764,7 @@ function inBounds(b, lon, lat) {
 function updateViewSummary() {
   const b = viewBounds();
   const events = visibleEvents().filter((f) => !b || inBounds(b, ...f.geometry.coordinates));
-  $("vs-scope").textContent = b ? "Zone visible" : "Monde entier";
+  $("vs-scope").textContent = b ? tr("scope_zone") : tr("scope_world");
 
   let fat = 0, verified = 0;
   const byType = {};
@@ -487,9 +776,9 @@ function updateViewSummary() {
     }
     byType[p.event_type] = (byType[p.event_type] || 0) + 1;
   }
-  $("vs-events").textContent = events.length.toLocaleString("fr-FR");
-  $("vs-fat").textContent = fat.toLocaleString("fr-FR");
-  $("vs-verified").textContent = verified.toLocaleString("fr-FR");
+  $("vs-events").textContent = events.length.toLocaleString(numLocale());
+  $("vs-fat").textContent = fat.toLocaleString(numLocale());
+  $("vs-verified").textContent = verified.toLocaleString(numLocale());
 
   const max = Math.max(1, ...Object.values(byType));
   $("vs-types").innerHTML = Object.entries(byType)
@@ -566,7 +855,7 @@ function renderJournal(fromIdx, toIdx) {
   const spanning = toIdx > fromIdx;
   journalEl.hidden = timelineUserHidden;
   $("tj-date").textContent = spanning ? `${frDate(new Date(timelineStart.getTime() + fromIdx * 86400000).toISOString().slice(0, 10))} → ${frDate(day)}` : frDate(day);
-  $("tj-count").textContent = events.length ? `${events.length} événement${events.length > 1 ? "s" : ""}` : "";
+  $("tj-count").textContent = events.length ? (LANG === "fr" ? `${events.length} événement${events.length > 1 ? "s" : ""}` : `${events.length} event${events.length > 1 ? "s" : ""}`) : "";
   journalItems = events.length
     ? [...events].sort((a, b) => eventWeight(b.properties) - eventWeight(a.properties)).slice(0, 12)
     : [];
@@ -574,11 +863,11 @@ function renderJournal(fromIdx, toIdx) {
     ? journalItems
         .map((f, i) => {
           const p = f.properties;
-          const meta = [EVENT_TYPE_LABELS[p.event_type] || p.event_type, p.fatalities ? `${p.fatalities} victimes` : null].filter(Boolean).join(" · ");
-          return `<li data-i="${i}"><b>${escapeHtml(p.name || "Événement")}</b><span>${escapeHtml(meta)}</span></li>`;
+          const meta = [EVENT_TYPE_LABELS[p.event_type] || p.event_type, p.fatalities ? (LANG === "fr" ? `${p.fatalities} victimes` : `${p.fatalities} fatalities`) : null].filter(Boolean).join(" · ");
+          return `<li data-i="${i}"><b>${escapeHtml(p.name || tr("default_event"))}</b><span>${escapeHtml(meta)}</span></li>`;
         })
         .join("")
-    : `<li class="tj-empty">Aucun événement recensé ce jour-là.</li>`;
+    : `<li class="tj-empty">${LANG === "fr" ? "Aucun événement recensé ce jour-là." : "No event recorded that day."}</li>`;
 }
 $("tj-list").addEventListener("click", (e) => {
   const li = e.target.closest("li[data-i]");
@@ -597,7 +886,7 @@ function applyTimeline() {
   const idx = Number(slider.value);
   const day = new Date(timelineStart.getTime() + idx * 86400000).toISOString().slice(0, 10);
   state.cutoff = idx >= Number(slider.max) ? null : day;
-  $("timeline-label").textContent = `jusqu'au ${frDate(day)}`;
+  $("timeline-label").textContent = `${LANG === "fr" ? "jusqu'au" : "up to"} ${frDate(day)}`;
   if (idx !== lastJournalIdx) {
     const fromIdx = lastJournalIdx >= 0 && idx > lastJournalIdx ? lastJournalIdx + 1 : idx;
     renderJournal(fromIdx, idx);
@@ -684,15 +973,22 @@ function renderTrendChart() {
   $("trend-chart").innerHTML = counts
     .map((c, i) => {
       const day = frDate(new Date(start + i * 86400000).toISOString().slice(0, 10));
-      const title = fatalities[i] ? `${day} : ${c} événement(s), ${fatalities[i]} victimes` : `${day} : ${c} événement(s)`;
+      const title =
+        LANG === "fr"
+          ? fatalities[i] ? `${day} : ${c} événement(s), ${fatalities[i]} victimes` : `${day} : ${c} événement(s)`
+          : fatalities[i] ? `${day}: ${c} event(s), ${fatalities[i]} fatalities` : `${day}: ${c} event(s)`;
       return `<span style="height:${c ? Math.max(8, Math.sqrt(c / max) * 100) : 0}%" title="${escapeHtml(title)}"></span>`;
     })
     .join("");
-  $("trend-period").textContent = `${days} j`;
+  $("trend-period").textContent = LANG === "fr" ? `${days} j` : `${days} d`;
   const totalFatal = fatalities.reduce((a, b) => a + b, 0);
   $("trend-summary").textContent = state.events.length
-    ? `${state.events.length} événement(s)${totalFatal ? ` · ${totalFatal} victimes qualifiées` : ""}`
-    : "Aucun événement sur la période.";
+    ? LANG === "fr"
+      ? `${state.events.length} événement(s)${totalFatal ? ` · ${totalFatal} victimes qualifiées` : ""}`
+      : `${state.events.length} event(s)${totalFatal ? ` · ${totalFatal} qualified fatalities` : ""}`
+    : LANG === "fr"
+      ? "Aucun événement sur la période."
+      : "No event over the period.";
 }
 
 async function loadEvents() {
@@ -720,23 +1016,29 @@ async function loadEvents() {
       if (!st) return;
       if (!st.ok) {
         $(`${k}-status`).title = st.error || "";
-        return setStatus(k, { text: "indisponible", kind: "warn" });
+        return setStatus(k, { text: LANG === "fr" ? "indisponible" : "unavailable", kind: "warn" });
       }
       const un = st.meta?.unlocated;
       $("ucdp-note").hidden = !(k === "ucdp" && un?.count);
       if (k === "ucdp" && un?.count) {
-        $("ucdp-note").textContent = `UCDP : ${un.count} événement${un.count > 1 ? "s" : ""} sans localisation précise (${un.fatalities.toLocaleString("fr-FR")} victimes cumulées) ne sont pas cartographiés.`;
+        $("ucdp-note").textContent =
+          LANG === "fr"
+            ? `UCDP : ${un.count} événement${un.count > 1 ? "s" : ""} sans localisation précise (${un.fatalities.toLocaleString(numLocale())} victimes cumulées) ne sont pas cartographiés.`
+            : `UCDP: ${un.count} event${un.count > 1 ? "s" : ""} without precise location (${un.fatalities.toLocaleString(numLocale())} cumulated fatalities) are not mapped.`;
       }
-      const upTo = st.meta?.latest_date ? `jusqu'au ${frDate(st.meta.latest_date).slice(0, 5)}` : "";
+      const upTo = st.meta?.latest_date ? `${LANG === "fr" ? "jusqu'au" : "up to"} ${frDate(st.meta.latest_date).slice(0, 5)}` : "";
       $(`${k}-status`).title = "";
-      setStatus(k, { text: [`${st.count} événement${st.count > 1 ? "s" : ""}`, upTo].filter(Boolean).join(" · "), kind: "ok" });
+      setStatus(k, { text: [LANG === "fr" ? `${st.count} événement${st.count > 1 ? "s" : ""}` : `${st.count} event${st.count > 1 ? "s" : ""}`, upTo].filter(Boolean).join(" · "), kind: "ok" });
     });
     renderSourceAlert(data.sources, selected);
     setupTimeline();
     renderConflicts(true);
     renderTrendChart();
     const confirmed = state.events.filter((f) => f.properties.confidence === "confirmed").length;
-    $("status").textContent = `${state.events.length} événement(s), dont ${confirmed} confirmé(s) — mis à jour à ${new Date().toLocaleTimeString("fr-FR")}`;
+    $("status").textContent =
+      LANG === "fr"
+        ? `${state.events.length} événement(s), dont ${confirmed} confirmé(s) — mis à jour à ${new Date().toLocaleTimeString(numLocale())}`
+        : `${state.events.length} event(s), including ${confirmed} confirmed — updated at ${new Date().toLocaleTimeString(numLocale())}`;
   } catch (err) {
     state.events = [];
     state.dataVersion = (state.dataVersion || 0) + 1;
@@ -1247,9 +1549,9 @@ function clusterCanvas(n, color) {
 }
 
 const CONTEXT_LAYERS = [
-  { key: "nuclear", endpoint: "/api/nuclear-sites", glyph: "☢️", color: "#f4d03f", kind: "Installation nucléaire civile", provider: "Wikidata", empty: "Site nucléaire" },
-  { key: "military", endpoint: "/api/military-sites", glyph: "🎖️", color: "#5b9bf0", kind: "Site militaire", provider: "OpenStreetMap", empty: "Site militaire" },
-  { key: "infrastructure", endpoint: "/api/infrastructure-sites", glyph: "✈️", color: "#7ed6c1", kind: "Infrastructure", provider: "OpenStreetMap", empty: "Infrastructure" },
+  { key: "nuclear", endpoint: "/api/nuclear-sites", glyph: "☢️", color: "#f4d03f", kindKey: "kind_nuclear", provider: "Wikidata" },
+  { key: "military", endpoint: "/api/military-sites", glyph: "🎖️", color: "#5b9bf0", kindKey: "kind_military", provider: "OpenStreetMap" },
+  { key: "infrastructure", endpoint: "/api/infrastructure-sites", glyph: "✈️", color: "#7ed6c1", kindKey: "kind_infrastructure", provider: "OpenStreetMap" },
 ];
 for (const L of CONTEXT_LAYERS) {
   L.source = new Cesium.CustomDataSource(L.key);
@@ -1281,14 +1583,14 @@ async function loadContextLayer(L, retry = 0) {
       const entity = L.source.entities.add({
         position: Cesium.Cartesian3.fromDegrees(lon, lat),
         billboard: { image: L.icon, scale: 0.5, disableDepthTestDistance: 30000, distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 4.5e6) },
-        name: p.name || L.empty,
+        name: p.name || tr(L.kindKey),
       });
       panelInfo.set(entity, {
-        kind: `${L.glyph} ${L.kind}`,
-        title: p.name || L.empty,
+        kind: `${L.glyph} ${tr(L.kindKey)}`,
+        title: p.name || tr(L.kindKey),
         badge: RELIABILITY.community,
         sourceLabel: L.provider,
-        rows: [["Pays", p.country], ["Statut", p.status], ["Type", p.type], ["Opérateur", p.operator]],
+        rows: [[tr("row_country"), p.country], [tr("row_status"), p.status], [tr("row_type"), p.type], [tr("row_operator"), p.operator]],
         lon, lat,
       });
     }
@@ -1349,17 +1651,17 @@ function cellColor(s) {
 function controlPanel(cell, cutoffCompact) {
   const s = cellStateAt(cell, cutoffCompact);
   return {
-    kind: "Contrôle territorial (Ukraine)",
-    title: s.R >= s.C && s.R > 0 ? "Zone sous contrôle russe" : s.C > 0 ? "Zone contestée" : "Zone récemment libérée",
+    kind: tr("control_kind_ukraine"),
+    title: s.R >= s.C && s.R > 0 ? tr("zone_russian") : s.C > 0 ? tr("zone_contested") : tr("zone_liberated"),
     badge: RELIABILITY.modeled,
     sourceLabel: "VIINA 2.0",
-    rows: [["Région", cell.admin1], ["Localités sous contrôle russe", s.R || null], ["Localités contestées", s.C || null], ["Données au", frDate(controlData.as_of)]],
-    itemsTitle: "Changements de main",
+    rows: [[tr("row_region"), cell.admin1], [tr("row_localities_russian"), s.R || null], [tr("row_localities_contested"), s.C || null], [tr("row_data_as_of"), frDate(controlData.as_of)]],
+    itemsTitle: tr("items_title_changes"),
     items: s.changes.sort((a, b) => b.changed - a.changed).slice(0, 8).map((r) => ({
       title: r.name,
-      meta: `${r.status === "R" ? "passée sous contrôle russe" : r.status === "C" ? "devenue contestée" : "libérée"} · ${String(r.changed).replace(/(\d{4})(\d{2})(\d{2})/, "$3/$2/$1")}`,
+      meta: `${r.status === "R" ? tr("change_to_russian") : r.status === "C" ? tr("change_to_contested") : tr("change_liberated")} · ${String(r.changed).replace(/(\d{4})(\d{2})(\d{2})/, "$3/$2/$1")}`,
     })),
-    notes: "Estimation par vote entre plusieurs sources (DeepStateMap, ISW, Wikipédia, presse), agrégée en hexagones de ~17 km. Ce n'est pas une ligne de front officielle.",
+    notes: tr("control_notes_ukraine"),
     url: controlData.url,
     lon: cell.lon, lat: cell.lat, zoomRange: 60000,
   };
@@ -1481,12 +1783,12 @@ async function loadYemenControl() {
       // plaques noires irrégulières. BOTH le classifie sur les deux.
       entity.polygon.classificationType = Cesium.ClassificationType.BOTH;
       panelInfo.set(entity, {
-        kind: "Contrôle territorial (Yémen)",
-        title: p.admin2 || "District",
+        kind: tr("control_kind_yemen"),
+        title: p.admin2 || tr("district_default"),
         badge: RELIABILITY.modeled,
         sourceLabel: "ACAPS",
-        rows: [["Gouvernorat", p.admin1], ["Contrôle", p.controller_label], ["Données au", frDate(yemenControlData.as_of)]],
-        notes: "Zones de contrôle par district (admin2), mise à jour environ trimestrielle par ACAPS. Ce n'est pas une ligne de front quotidienne.",
+        rows: [[tr("row_governorate"), p.admin1], [tr("row_control"), p.controller_label], [tr("row_data_as_of"), frDate(yemenControlData.as_of)]],
+        notes: tr("control_notes_yemen"),
         url: yemenControlData.url,
       });
     }
@@ -1541,11 +1843,11 @@ async function loadWestBankControl() {
       // cf. loadYemenControl() : évite les plaques noires sous les tuiles 3D.
       entity.polygon.classificationType = Cesium.ClassificationType.BOTH;
       panelInfo.set(entity, {
-        kind: "Contrôle territorial (Cisjordanie)",
-        title: p.zone_label || "Zone",
+        kind: tr("control_kind_westbank"),
+        title: p.zone_label || tr("zone_default"),
         badge: RELIABILITY.modeled,
         sourceLabel: "OCHA (oPt)",
-        rows: [["Données au", frDate(westbankControlData.as_of)]],
+        rows: [[tr("row_data_as_of"), frDate(westbankControlData.as_of)]],
         notes: westbankControlData.note,
         url: westbankControlData.url,
       });
@@ -1587,9 +1889,9 @@ function renderDailySummary(features) {
     }
     byType[p.event_type] = (byType[p.event_type] || 0) + 1;
   }
-  $("daily-events").textContent = features.length.toLocaleString("fr-FR");
-  $("daily-fat").textContent = fat.toLocaleString("fr-FR");
-  $("daily-verified").textContent = verified.toLocaleString("fr-FR");
+  $("daily-events").textContent = features.length.toLocaleString(numLocale());
+  $("daily-fat").textContent = fat.toLocaleString(numLocale());
+  $("daily-verified").textContent = verified.toLocaleString(numLocale());
   const max = Math.max(1, ...Object.values(byType));
   $("daily-types").innerHTML = Object.entries(byType)
     .sort((a, b) => b[1] - a[1])
@@ -1605,7 +1907,7 @@ function renderLiveFeed() {
     .map((f, i) => {
       const p = f.properties;
       const meta = [EVENT_TYPE_LABELS[p.event_type] || p.event_type, p.event_date ? frDate(p.event_date) : null].filter(Boolean).join(" · ");
-      return `<li data-i="${i}"><b>${escapeHtml(p.name || "Événement")}</b><span>${escapeHtml(meta)}</span></li>`;
+      return `<li data-i="${i}"><b>${escapeHtml(p.name || tr("default_event"))}</b><span>${escapeHtml(meta)}</span></li>`;
     })
     .join("");
 }
@@ -1621,11 +1923,12 @@ async function pollLiveFeed() {
   try {
     const data = await apiJson("/api/conflicts?days=1&event_type=all&sources=ucdp,gdelt");
     const features = data.features || [];
-    const nowStr = new Date().toLocaleTimeString("fr-FR");
+    const nowStr = new Date().toLocaleTimeString(numLocale());
     if (firstLivePoll) {
       features.forEach((f) => seenEventKeys.add(eventKey(f)));
       firstLivePoll = false;
-      $("live-status").textContent = `Suivi démarré à ${nowStr} — les événements à venir apparaîtront ici.`;
+      $("live-status").textContent =
+        LANG === "fr" ? `Suivi démarré à ${nowStr} — les événements à venir apparaîtront ici.` : `Tracking started at ${nowStr} — upcoming events will appear here.`;
     } else {
       const fresh = features.filter((f) => !seenEventKeys.has(eventKey(f)));
       features.forEach((f) => seenEventKeys.add(eventKey(f)));
@@ -1634,11 +1937,15 @@ async function pollLiveFeed() {
         renderLiveFeed();
       }
       $("live-status").textContent = fresh.length
-        ? `${fresh.length} nouveau${fresh.length > 1 ? "x" : ""} événement${fresh.length > 1 ? "s" : ""} détecté${fresh.length > 1 ? "s" : ""} à ${nowStr}.`
-        : `Aucun nouvel événement — vérifié à ${nowStr}.`;
+        ? LANG === "fr"
+          ? `${fresh.length} nouveau${fresh.length > 1 ? "x" : ""} événement${fresh.length > 1 ? "s" : ""} détecté${fresh.length > 1 ? "s" : ""} à ${nowStr}.`
+          : `${fresh.length} new event${fresh.length > 1 ? "s" : ""} detected at ${nowStr}.`
+        : LANG === "fr"
+          ? `Aucun nouvel événement — vérifié à ${nowStr}.`
+          : `No new event — checked at ${nowStr}.`;
     }
     renderDailySummary(features);
-    $("daily-status").textContent = `Mis à jour à ${nowStr}.`;
+    $("daily-status").textContent = LANG === "fr" ? `Mis à jour à ${nowStr}.` : `Updated at ${nowStr}.`;
   } catch (err) {
     $("live-status").textContent = `⚠️ ${err.message}`;
     $("daily-status").textContent = `⚠️ ${err.message}`;
@@ -1658,22 +1965,24 @@ function urlBase64ToUint8Array(base64url) {
   return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
 }
 
-async function setPushButton(state) {
+let lastPushState = "idle";
+async function setPushButton(pushState) {
+  lastPushState = pushState;
   const btn = $("push-toggle");
   const status = $("push-status");
-  if (state === "unsupported") {
+  if (pushState === "unsupported") {
     btn.disabled = true;
-    btn.textContent = "🔕 Notifications non disponibles";
-    status.textContent = "Ce navigateur ne prend pas en charge les notifications push.";
-  } else if (state === "denied") {
+    btn.textContent = tr("push_unsupported");
+    status.textContent = tr("push_unsupported_status");
+  } else if (pushState === "denied") {
     btn.disabled = true;
-    btn.textContent = "🔕 Notifications bloquées";
-    status.textContent = "Autorise les notifications pour ce site dans les réglages du navigateur.";
-  } else if (state === "subscribed") {
-    btn.textContent = "🔕 Désactiver les notifications";
-    status.textContent = "Tu seras notifié quand un nouvel événement apparaît, même onglet en arrière-plan.";
+    btn.textContent = tr("push_denied");
+    status.textContent = tr("push_denied_status");
+  } else if (pushState === "subscribed") {
+    btn.textContent = tr("push_disable");
+    status.textContent = tr("push_subscribed_status");
   } else {
-    btn.textContent = "🔔 Activer les notifications";
+    btn.textContent = tr("push_enable");
     status.textContent = "";
   }
 }
@@ -1738,7 +2047,7 @@ async function initPush() {
     if (!sub) return;
     try {
       await subscribePush(reg);
-      $("push-status").textContent = pushCountries().length ? "Filtre mis à jour." : "Notifié pour tous les pays suivis.";
+      $("push-status").textContent = pushCountries().length ? tr("push_filter_updated") : tr("push_filter_all");
     } catch (err) {
       $("push-status").textContent = `⚠️ ${err.message}`;
     }
@@ -1764,10 +2073,29 @@ $("clock-local-zone").textContent = localZoneAbbr;
 function tickClock() {
   const now = new Date();
   $("clock-utc").textContent = now.toISOString().substring(11, 19);
-  $("clock-local").textContent = now.toLocaleTimeString("fr-FR", { hour12: false });
+  $("clock-local").textContent = now.toLocaleTimeString(numLocale(), { hour12: false });
 }
 tickClock();
 setInterval(tickClock, 1000);
+
+// ───────────────────────── Bascule de langue ─────────────────────────
+function refreshLangLabels() {
+  RELIABILITY = RELIABILITY_BY_LANG[LANG];
+  CONFIDENCE_LABELS = CONFIDENCE_LABELS_BY_LANG[LANG];
+  EVENT_TYPE_LABELS = EVENT_TYPE_LABELS_BY_LANG[LANG];
+}
+$("lang-toggle").addEventListener("click", () => {
+  LANG = LANG === "fr" ? "en" : "fr";
+  localStorage.setItem("strategos_lang", LANG);
+  applyI18n();
+  refreshLangLabels();
+  setPushButton(lastPushState);
+  hideSidePanel();
+  tickClock();
+  loadAll();
+  renderLiveFeed(); // rafraîchit immédiatement le libellé des événements déjà affichés
+  pollLiveFeed(); // rafraîchit le résumé du jour (sinon en attente du prochain sondage)
+});
 
 loadFilters().then(() => {
   applySharedState();
