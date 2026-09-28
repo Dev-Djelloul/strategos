@@ -1328,6 +1328,11 @@ async function loadYemenControl() {
       entity.polygon.material = color;
       entity.polygon.outline = true;
       entity.polygon.outlineColor = color.withAlpha(0.9);
+      // Sans ceci, un polygone drapé au sol (clampToGround) ne se classifie
+      // que sur le terrain : avec les tuiles 3D photoréalistes (Villes 3D),
+      // qui remplacent visuellement le terrain, ça se traduit par des
+      // plaques noires irrégulières. BOTH le classifie sur les deux.
+      entity.polygon.classificationType = Cesium.ClassificationType.BOTH;
       panelInfo.set(entity, {
         kind: "Contrôle territorial (Yémen)",
         title: p.admin2 || "District",
@@ -1386,6 +1391,8 @@ async function loadWestBankControl() {
       entity.polygon.material = color;
       entity.polygon.outline = true;
       entity.polygon.outlineColor = color.withAlpha(0.9);
+      // cf. loadYemenControl() : évite les plaques noires sous les tuiles 3D.
+      entity.polygon.classificationType = Cesium.ClassificationType.BOTH;
       panelInfo.set(entity, {
         kind: "Contrôle territorial (Cisjordanie)",
         title: p.zone_label || "Zone",
