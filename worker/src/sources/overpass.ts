@@ -90,12 +90,21 @@ export function queryOverpass(
  * qui dépasse la limite de requêtes HTTP concurrentes d'un Worker — les
  * plus anciennes sont alors annulées de force ("stalled HTTP response was
  * canceled to prevent deadlock") avant même d'avoir une réponse. */
-export async function withConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const results: R[] = new Array(items.length);
+// `null` marque un item qui a échoué (ex. pays trop lent) : sans ce filet,
+// une exception non rattrapée dans un worker interrompait sa boucle pour de
+// bon (les items suivants qui lui étaient assignés n'étaient jamais tentés)
+// et faisait échouer tout le lot via Promise.all — à l'exact opposé du but
+// de cette fonction, qui est d'obtenir les résultats rapides malgré les lents.
+export async function withConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<(R | null)[]> {
+  const results: (R | null)[] = new Array(items.length).fill(null);
   let next = 0;
   async function worker() {
     for (let i = next++; i < items.length; i = next++) {
-      results[i] = await fn(items[i]);
+      try {
+        results[i] = await fn(items[i]);
+      } catch {
+        results[i] = null;
+      }
     }
   }
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
