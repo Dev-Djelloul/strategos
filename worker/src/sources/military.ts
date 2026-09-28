@@ -18,16 +18,24 @@ import { COUNTRY_BOUNDS } from "./acled.ts";
 import { queryOverpass, withConcurrency } from "./overpass.ts";
 
 const BASE_VALUES = ["base", "barracks", "naval_base", "airfield", "office", "depot"];
-// Requêtes lancées 4 à la fois (voir withConcurrency) : toutes les lancer
+// Requêtes lancées 6 à la fois (voir withConcurrency) : toutes les lancer
 // d'un coup (6 valeurs x 10 pays = 60 ici) dépasse la limite de requêtes
 // HTTP concurrentes du Worker.
-const MAX_CONCURRENT = 4;
+const MAX_CONCURRENT = 6;
+// Avec 60 combinaisons valeur/pays, chacune pouvant attendre jusqu'à waitMs
+// avant d'abandonner (cachedFetch), un défaut de 8 s (comme pour un lot plus
+// petit) fait dépasser la limite de temps d'une requête entière sur premier
+// chargement — la requête n'aboutit alors jamais (aucune réponse), pire que
+// l'ancien 503 rapide. Un délai court garde la réponse rapide ; les
+// combinaisons pas encore prêtes se rattraperont au prochain appel (le
+// chargement continue en arrière-plan via ctx.waitUntil dans cachedFetch).
+const DEFAULT_WAIT_MS = 1500;
 
 function queryFor(value: string, bboxClause: string): string {
   return `[out:json][timeout:50];nwr["military"="${value}"]["name"]${bboxClause};out geom 400;`;
 }
 
-export async function fetchMilitarySites(env: Env, ctx: Ctx, waitMs?: number): Promise<FeatureCollection> {
+export async function fetchMilitarySites(env: Env, ctx: Ctx, waitMs = DEFAULT_WAIT_MS): Promise<FeatureCollection> {
   const jobs = BASE_VALUES.flatMap((value) => Object.entries(COUNTRY_BOUNDS).map(([code, bounds]) => ({ value, code, bounds })));
   const results = await withConcurrency(jobs, MAX_CONCURRENT, ({ value, code, bounds: [west, south, east, north] }) =>
     queryOverpass(env, ctx, queryFor(value, `(${south},${west},${north},${east})`), `military_v3_${value}_${code}`, "Site militaire", waitMs),

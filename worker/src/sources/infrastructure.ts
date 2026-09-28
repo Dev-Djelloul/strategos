@@ -10,10 +10,15 @@ import type { Ctx, Env, FeatureCollection } from "../types.ts";
 import { COUNTRY_BOUNDS } from "./acled.ts";
 import { queryOverpass, withConcurrency } from "./overpass.ts";
 
-// Requêtes lancées 4 à la fois (voir withConcurrency) : toutes les lancer
+// Requêtes lancées 6 à la fois (voir withConcurrency) : toutes les lancer
 // d'un coup (30 ici : 3 catégories x 10 pays) dépasse la limite de requêtes
 // HTTP concurrentes du Worker.
-const MAX_CONCURRENT = 4;
+const MAX_CONCURRENT = 6;
+// cf. military.ts : borne le délai d'attente par combinaison pour que la
+// requête globale réponde vite même à froid (30 combinaisons), quitte à
+// laisser certaines encore "pas prêtes" à ce tour — elles se rattrapent en
+// arrière-plan pour le prochain appel.
+const DEFAULT_WAIT_MS = 2000;
 
 const CATEGORIES: Record<string, { label: string; ql: (bbox: string) => string }> = {
   airports: {
@@ -35,7 +40,7 @@ out geom 300;`,
   },
 };
 
-export async function fetchInfrastructureSites(env: Env, ctx: Ctx, waitMs?: number): Promise<FeatureCollection> {
+export async function fetchInfrastructureSites(env: Env, ctx: Ctx, waitMs = DEFAULT_WAIT_MS): Promise<FeatureCollection> {
   const jobs = Object.entries(CATEGORIES).flatMap(([name, cat]) =>
     Object.entries(COUNTRY_BOUNDS).map(([code, bounds]) => ({ name, cat, code, bounds })),
   );
