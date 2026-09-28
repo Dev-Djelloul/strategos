@@ -40,7 +40,7 @@ export async function fetchInfrastructureSites(env: Env, ctx: Ctx, waitMs?: numb
     Object.entries(COUNTRY_BOUNDS).map(([code, bounds]) => ({ name, cat, code, bounds })),
   );
   const results = await withConcurrency(jobs, MAX_CONCURRENT, ({ name, cat, code, bounds: [west, south, east, north] }) =>
-    queryOverpass(env, ctx, cat.ql(`(${south},${west},${north},${east})`), `infra_${name}_${code}`, cat.label, waitMs),
+    queryOverpass(env, ctx, cat.ql(`(${south},${west},${north},${east})`), `infra_v2_${name}_${code}`, cat.label, waitMs),
   );
   // cf. fetchMilitarySites : un pays/catégorie en échec ne doit pas priver
   // l'utilisateur de ceux déjà disponibles — seul un échec total est une panne.

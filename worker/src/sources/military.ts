@@ -31,7 +31,7 @@ out geom 400;`;
 
 export async function fetchMilitarySites(env: Env, ctx: Ctx, waitMs?: number): Promise<FeatureCollection> {
   const results = await withConcurrency(Object.entries(COUNTRY_BOUNDS), MAX_CONCURRENT, ([code, [west, south, east, north]]) =>
-    queryOverpass(env, ctx, queryFor(`(${south},${west},${north},${east})`), `military_${code}`, "Site militaire", waitMs),
+    queryOverpass(env, ctx, queryFor(`(${south},${west},${north},${east})`), `military_v2_${code}`, "Site militaire", waitMs),
   );
   // Un pays en échec (source lente, jamais encore en cache) ne doit pas
   // priver l'utilisateur des pays déjà disponibles — seul un échec total
