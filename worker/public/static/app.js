@@ -1052,8 +1052,20 @@ scene.preRender.addEventListener(() => {
   // frame, hors du champ en un instant.
   const speed = Math.min(20000, Math.max(1.5, viewer.camera.positionCartographic.height * 0.06));
   const turnSpeed = Cesium.Math.toRadians(1.6);
-  if (pressedMoves.has("fwd")) viewer.camera.moveForward(speed);
-  if (pressedMoves.has("back")) viewer.camera.moveBackward(speed);
+  if (pressedMoves.has("fwd") || pressedMoves.has("back")) {
+    // moveForward/moveBackward avancent le long de l'axe de visée exact : en
+    // vue plongeante, ça revient à descendre en biais vers le sol au lieu
+    // d'avancer "à plat" comme en marchant. On avance donc dans le plan
+    // horizontal local (est-nord), dans la direction du cap, sans tenir
+    // compte du tangage — l'altitude ne bouge que si on monte/descend soi-même.
+    const heading = viewer.camera.heading;
+    const forwardENU = new Cesium.Cartesian3(Math.sin(heading), Math.cos(heading), 0);
+    const transform = Cesium.Transforms.eastNorthUpToFixedFrame(viewer.camera.positionWC);
+    const forwardWorld = Cesium.Matrix4.multiplyByPointAsVector(transform, forwardENU, new Cesium.Cartesian3());
+    Cesium.Cartesian3.normalize(forwardWorld, forwardWorld);
+    if (pressedMoves.has("fwd")) viewer.camera.move(forwardWorld, speed);
+    if (pressedMoves.has("back")) viewer.camera.move(forwardWorld, -speed);
+  }
   if (pressedMoves.has("turnleft") || pressedMoves.has("turnright")) {
     // lookLeft/lookRight tournent autour du "up" propre de la caméra : dès
     // que le tangage n'est plus exactement horizontal, ce vecteur dérive de
