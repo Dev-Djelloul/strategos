@@ -1372,7 +1372,7 @@ $("photo3d-toggle").addEventListener("change", async (e) => {
     if (e.target.checked) {
       if (!photo3d) {
         photo3d = await Cesium.createGooglePhotorealistic3DTileset();
-        photo3d.maximumScreenSpaceError = 4; // détail fin au niveau rue
+        photo3d.maximumScreenSpaceError = matchMedia("(max-width: 600px)").matches ? 8 : 4;
         scene.primitives.add(photo3d);
       }
       photo3d.show = true;
